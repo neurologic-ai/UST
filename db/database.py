@@ -2,6 +2,7 @@ from pymongo.mongo_client import MongoClient
 from configs.config import MONGO_URI
 
 uri = MONGO_URI
+print(uri)
 client = MongoClient(uri)
 
 db = client.recommendation_db

@@ -6,6 +6,7 @@ from mongoengine import  ListField, DictField
 
 class InputData(BaseModel):
     cart_items: List
+    
 
 def to_serializable(doc):
     """Convert MongoDB ObjectId to string."""

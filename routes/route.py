@@ -1,9 +1,7 @@
 from fastapi import APIRouter
 from bson.json_util import dumps
-import json
-from db import database
 from collections import defaultdict
-from models.inputdata import InputData, to_serializable
+from models.schema import RecommendationRequestBody
 from models.hepler import categories_dct, Aggregation
 from db.database import popular_collection_name, time_collection_name, weather_collection_name, calendar_collection_name, association_collection_name
 
@@ -11,22 +9,19 @@ router = APIRouter()
 
 @router.get("/")
 async def get_data():
-    data = {}
     data = popular_collection_name.find()
     return dumps(data)
-##Middleware CORS layer, 
-## to use HTTPS SSL(CERT BOT) Certificate generate has to be routed through NGNIX, Authentication implementation JWT, Timezone, Shop location
 
 @router.post("/")
-async def recommendation(data: InputData):
+async def recommendation(data: RecommendationRequestBody):
     # Required inputs
     ######################################
-    top_n = 50
+    top_n = data.top_n
     cart_items = data.cart_items
-    current_hr = 20
-    current_dayofweek = 5
-    current_weather_category = 'Moderate'
-    current_holiday = ''
+    current_hr = data.current_hr
+    current_dayofweek = data.current_dayofweek
+    current_weather_category = data.current_weather_category
+    current_holiday = data.current_holiday
 
     ######################################
     # Initialize a dictionary to track the count of product appearances across all sources

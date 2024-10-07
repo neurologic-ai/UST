@@ -1,8 +1,25 @@
 from pymongo.mongo_client import MongoClient
-from configs.config import MONGO_URI
+from configs.manager import settings
+from loguru import logger
 
-uri = MONGO_URI
-client = MongoClient(uri)
+def ping_mongodb(uri):
+    try:
+        logger.info("Connecting to MongoDB...")
+        # Create a MongoClient object
+        client = MongoClient(uri, serverSelectionTimeoutMS=5000)  # Timeout after 5 seconds
+
+        # Ping the server
+        client.admin.command('ping')
+        logger.info("MongoDB server is available.")
+        return client  # Return the client for further use
+
+    except Exception as e:
+        logger.exception(f"Could not connect to MongoDB: {e}")
+        return None
+
+
+uri = settings.MONGO_URI
+client = ping_mongodb(uri)
 
 db = client.recommendation_db
 

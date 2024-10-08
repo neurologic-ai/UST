@@ -19,7 +19,12 @@ class BackendBaseSettings(BaseSettings):
     ALLOWED_ORIGINS: list[str]= ["http://localhost:3000"]
     ALLOWED_METHODS: list[str] = ["*"]
     ALLOWED_HEADERS: list[str] = ["*"]
-
+    
+    SERVER_HOST:str="127.0.0.1"
+    SERVER_PORT:int=8000
+    SERVER_WORKERS:int=4
+    LOG_LEVEL:str="debug"
+    SERVER_RELOAD:bool=True
     model_config = SettingsConfigDict(env_file=".env")
 
 

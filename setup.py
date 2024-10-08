@@ -3,7 +3,7 @@ from initial.data_validation import validate
 from initial.models import popular_based, time_based, calendar_based, association_based, weather_based
 from initial.constant import PROCESSED_DATA_PATH
 from utils.helper import insert_data
-from db.database import popular_collection_name, time_collection_name, weather_collection_name, calendar_collection_name, association_collection_name
+from db.singleton import popular_collection_name, time_collection_name, weather_collection_name, calendar_collection_name, association_collection_name
 
 
 def run_models_and_store_outputs():

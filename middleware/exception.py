@@ -1,5 +1,5 @@
-from traceback import print_exception
 
+from loguru import logger
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -9,7 +9,7 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
         except Exception as e:
-            print_exception(e)
+            logger.exception(e)
             return JSONResponse(
                 status_code=500, 
                 content={

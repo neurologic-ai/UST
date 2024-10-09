@@ -1,9 +1,9 @@
 from collections import defaultdict
 import pandas as pd
-from configs.config import CATEGORY_DATA_LOCATION
+from configs.manager import settings
 
 # Read Categories
-df_categories = pd.read_csv(CATEGORY_DATA_LOCATION)
+df_categories = pd.read_csv(settings.CATEGORY_DATA_LOCATION)
 
 class Product:
     def __init__(self, name = None, category = None, subcategory1 = None, subcategory2 = None, subcategory3 = None):

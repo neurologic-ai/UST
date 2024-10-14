@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import FastAPI
-from routes.route import router
+from routes.recommendation_route import router as recommendation_router
+from routes.user_route import router as user_router
 from loguru import logger
 from fastapi.middleware.cors import CORSMiddleware
 import fastapi
@@ -24,7 +25,8 @@ def initialize_backend_application() -> fastapi.FastAPI:
         allow_headers=settings.ALLOWED_HEADERS,
     )
     app.add_middleware(ExceptionHandlerMiddleware)
-    app.include_router(router)
+    app.include_router(recommendation_router)
+    app.include_router(user_router)
     return app
 
 
@@ -32,5 +34,4 @@ backend_app: fastapi.FastAPI = initialize_backend_application()
 
 
 if __name__ == "__main__":
-    
     uvicorn.run("main:backend_app", host = settings.SERVER_HOST, workers=settings.SERVER_WORKERS,reload=settings.SERVER_RELOAD, port = settings.SERVER_PORT,  log_level=settings.LOG_LEVEL)

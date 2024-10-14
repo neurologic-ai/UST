@@ -4,9 +4,6 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-
-
-
 class BackendBaseSettings(BaseSettings):
     
     MONGO_URI: str = decouple.config("MONGO_URI")

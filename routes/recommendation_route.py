@@ -10,6 +10,7 @@ from models.schema import RecommendationRequestBody
 from models.hepler import categories_dct, Aggregation
 from db.singleton import get_engine
 from models.db import Association_collection
+from routes.user_route import PermissionChecker
 from utils.helper import get_association_recommendations, get_calendar_recommendation, get_popular_recommendation, get_time_recommendation, get_weather_recommendation
 
 router = APIRouter()
@@ -23,9 +24,10 @@ async def get_data(
     return data
 
 
-@router.post("/")
+@router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
+    athorize:bool=Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
     # Required inputs

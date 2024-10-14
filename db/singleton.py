@@ -44,4 +44,4 @@ weather_collection_name = MongoDatabase()['weather_collection']
 calendar_collection_name = MongoDatabase()['calendar_collection']
 association_collection_name = MongoDatabase()['association_collection']
 
-__all__ = ["MongoDatabase", "ping", "close_connection","popular_collection_name", "time_collection_name", "weather_collection_name", "calendar_collection_name", "association_collection_name"]
+__all__ = ["MongoDatabase", "get_engine","ping", "close_connection","popular_collection_name", "time_collection_name", "weather_collection_name", "calendar_collection_name", "association_collection_name"]

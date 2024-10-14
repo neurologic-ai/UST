@@ -2,6 +2,17 @@
 from odmantic import Model
 from typing import Dict, List
 
+class User(Model):
+    username: str
+    password: str
+    permissions: list[str] = []
+
+    model_config = {
+        "collection": "user_collection"
+    }
+
+    
+
 class Association_collection(Model):
     product: str
     associate_products: Dict[str, int]

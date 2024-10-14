@@ -15,7 +15,7 @@ from utils.helper import get_association_recommendations, get_calendar_recommend
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("/view data")
 async def get_data(
     db: AIOEngine = Depends(get_engine)
 ):
@@ -27,7 +27,7 @@ async def get_data(
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    athorize:bool=Depends(PermissionChecker(['items:read'])),
+    # athorize:bool=Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
     # Required inputs

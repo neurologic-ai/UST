@@ -104,7 +104,6 @@ class Aggregation:
 
         for p in self.reco_list:
             subcategory = self.categories[p.strip()].subcategory1
-            print(p, subcategory)
             if category_count[subcategory] < self.max_subcategory_limit:
                 category_count[subcategory] += 1
                 refined_list.append(p)

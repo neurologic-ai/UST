@@ -24,14 +24,14 @@ for idx, row in df_categories.iterrows():
     categories_dct[str(p_n).strip()] = Product(str(p_n).strip(), cat, scat1, scat2, scat3)
 
 class Aggregation:
-    def __init__(self, reco_list, cart_items, categories, current_hour = 12):
+    def __init__(self, reco_list, cart_items, categories, current_hour):
         self.reco_list = reco_list
         self.cart_items = cart_items
         self.categories = categories
         self.current_hour = current_hour
         self.max_subcategory_limit = 3
         
-        self.excluded_subcategories = ['Water', 'Coffee/Tea', 'Tea', 'Coffee']
+        self.excluded_subcategories = ['Water', 'Coffee/Tea']
         self.strict_category_rules = {
             'Food': ['Home Decor', 'Cloths', 'Personal Care', 'Medicine', 'Toys', 'Reading'],
             'Beverage': ['Home Decor', 'Cloths', 'Personal Care', 'Medicine', 'Toys', 'Reading'],
@@ -67,17 +67,13 @@ class Aggregation:
     def exclude_cart_items(self):
         """Remove items already in the cart from the recommendation list."""
         self.reco_list = [p for p in self.reco_list if p not in self.cart_items]
-        # print(self.reco_list)
         
     def exclude_obvious_categories(self):
         """Remove products from excluded subcategories."""
-        # print([self.categories.get(p.strip(), Product()).subcategory1 for p in self.reco_list])
         self.reco_list = [
             p for p in self.reco_list 
             if self.categories[p.strip()].subcategory1 not in self.excluded_subcategories
         ]
-        # print([self.categories.get(p.strip(), Product()).subcategory1 for p in self.reco_list])
-        # print(self.reco_list)
 
     def remove_non_timely_products(self):
         """Exclude products that are not appropriate for the current time."""
@@ -86,7 +82,6 @@ class Aggregation:
             if self.categories[p.strip()].subcategory3 not in self.time_slots
             or self.current_hour in range(*self.time_slots[self.categories[p.strip()].subcategory3])
         ]
-        # print(self.reco_list)
     
     def prioritize_associations(self):
         """Prioritize and filter products based on cart items."""
@@ -94,14 +89,13 @@ class Aggregation:
             return
 
         cart_subcats = {self.categories[p.strip()].subcategory1 for p in self.cart_items if self.categories[p.strip()].subcategory1 in self.mono_subcategories}
-        # print(cart_subcats)
 
         # Remove items in the same mono subcategory
         self.reco_list = [
             p for p in self.reco_list 
             if self.categories[p.strip()].subcategory1 not in cart_subcats
         ]
-        # print(self.reco_list)
+
         # Remove conflicting items based on strict category rules
         cart_cats = {self.categories[p.strip()].category for p in self.cart_items}
         conflicting_categories = set()
@@ -113,7 +107,6 @@ class Aggregation:
             p for p in self.reco_list 
             if self.categories[p.strip()].category not in conflicting_categories
         ]
-        # print(self.reco_list)
 
         # Prioritize cross-subcategory recommendations
         last_cart_item = self.cart_items[-1]
@@ -122,7 +115,6 @@ class Aggregation:
             prioritized_items = [p for p in self.reco_list 
                                  if self.categories[p.strip()].subcategory1 in self.cross_subcategories[cart_subcat1]]
             self.reco_list = prioritized_items + [item for item in self.reco_list if item not in prioritized_items]
-        # print(self.reco_list)
 
     def limit_same_category_occurrences(self):
         """Limit the number of products from the same category."""
@@ -146,20 +138,3 @@ class Aggregation:
         self.prioritize_associations()
         self.limit_same_category_occurrences()
         return self.reco_list
-
-
-# Example usage
-# reco_list = [
-#     "Dasani Purified Water 16.9 FL OZ (1.06 PT) 500 mL", "Dasani - 20 oz", "12 oz. Coffee/Tea", 
-#     "Quesadillas - Chicken", "Lays Classic Potato Chip", "Twizzlers", "Coke (16.9 fl. Oz)", 
-#     "Diet Coke 16.9oz.", "Coke", "Sprite", "Diet Coke", "Egg Salad Bagel", "Hat", 
-#     "Cherry Chapstick Blister Card"
-# ]
-
-# cart_items = []
-
-# current_hour = 10
-
-# aggregator = Aggregation(reco_list, cart_items, categories_dct, current_hour)
-# final_recommendations = aggregator.get_final_recommendations()
-# print(final_recommendations)

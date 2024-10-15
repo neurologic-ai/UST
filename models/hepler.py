@@ -1,6 +1,7 @@
 from collections import defaultdict
 import pandas as pd
 from configs.manager import settings
+from configs.constant import EXCLUDE_SUBCATEGORIES, STRICT_CATEGORY_RULES, MONO_CATEGORIES, CROSS_CATEGORIES, TIME_SLOTS, MAX_SUBCATEGORY_LIMIT
 
 # Read Categories
 df_categories = pd.read_csv(settings.CATEGORY_DATA_LOCATION)
@@ -24,45 +25,25 @@ for idx, row in df_categories.iterrows():
     categories_dct[str(p_n).strip()] = Product(str(p_n).strip(), cat, scat1, scat2, scat3)
 
 class Aggregation:
-    def __init__(self, reco_list, cart_items, categories, current_hour):
+    def __init__(self, reco_list, cart_items, categories, current_hour,
+                 excluded_subcategories = EXCLUDE_SUBCATEGORIES,
+                 strict_category_rules = STRICT_CATEGORY_RULES,
+                 mono_subcategories = MONO_CATEGORIES,
+                 cross_subcategories = CROSS_CATEGORIES,
+                 time_slots = TIME_SLOTS,
+                 max_subcategory_limit = MAX_SUBCATEGORY_LIMIT):
+        
         self.reco_list = reco_list
         self.cart_items = cart_items
         self.categories = categories
         self.current_hour = current_hour
-        self.max_subcategory_limit = 3
         
-        self.excluded_subcategories = ['Water', 'Coffee/Tea']
-        self.strict_category_rules = {
-            'Food': ['Home Decor', 'Cloths', 'Personal Care', 'Medicine', 'Toys', 'Reading'],
-            'Beverage': ['Home Decor', 'Cloths', 'Personal Care', 'Medicine', 'Toys', 'Reading'],
-            'Medicine': ['Home Decor', 'Cloths', 'Personal Care', 'Toys'],
-            'Toys': ['Medicine']
-        }
-        self.mono_subcategories = [
-            'Water', 'Juice', 'Coffee/Tea', 'Soda/Soft Drink', 'Smoothie', 'Fries', 
-            'Protein Drinks', 'Cold Coffee', 'Cereal', 'Pastry', 'Condiments', 'Dairy', 'Burgers', 'Coke'
-        ]
-        self.cross_subcategories = {
-            'Burger': ['Fries', 'Coke'],
-            'Sandwich': ['Soda', 'Soft Drink'],
-            'Salad': ['Protein (Chicken/Meat)'],
-            'Snack': ['Snack', 'Soda/Soft Drink'],
-            'Meal': ['Coke', 'Soda'],
-            'Wrap': ['Juice'],
-            'Smoothie': ['Fruit'],
-            'Burrito': ['Side'],
-            'Cold Coffee': ['Pastry'],
-            'Cereal': ['Milk'],
-            'Apparel': ['Bags'],
-            'Platter': ['Drink'],
-        }
-        self.time_slots = {
-            'Breakfast': [5, 12],
-            'Breakfast/Lunch': [5, 18],
-            'Lunch': [12, 18],
-            'Lunch/Dinner': [12, 23],
-            'Dinner': [18, 23]
-        }
+        self.excluded_subcategories = excluded_subcategories
+        self.strict_category_rules = strict_category_rules
+        self.mono_subcategories = mono_subcategories
+        self.cross_subcategories = cross_subcategories
+        self.time_slots = time_slots
+        self.max_subcategory_limit = max_subcategory_limit
 
     def exclude_cart_items(self):
         """Remove items already in the cart from the recommendation list."""

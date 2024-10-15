@@ -1,16 +1,38 @@
-## To keep constant items
-## Setup to strat and store the data
-## Input
-## Certification
-## Time conversions
-## CSV store in Mongodb
+EXCLUDE_SUBCATEGORIES = ['Water']#, 'Coffee/Tea']
 
-## 2nd Face
-## Event Based
-## Apriori Algo
-## Feedback loop (AutoML)
-## ML Based
-## Cluster
+STRICT_CATEGORY_RULES = {
+            'Food': ['Home Decor', 'Cloths', 'Personal Care', 'Medicine', 'Toys', 'Reading'],
+            'Beverage': ['Home Decor', 'Cloths', 'Personal Care', 'Medicine', 'Toys', 'Reading'],
+            'Medicine': ['Home Decor', 'Cloths', 'Personal Care', 'Toys'],
+            'Toys': ['Medicine']
+        }
 
-## Access control, access table creation
-## Multi-Tenant Application
+MONO_CATEGORIES = [
+            'Water', 'Juice', 'Coffee/Tea', 'Soda/Soft Drink', 'Smoothie', 'Fries', 
+            'Protein Drinks', 'Cold Coffee', 'Cereal', 'Pastry', 'Condiments', 'Dairy', 'Burgers', 'Coke'
+        ]
+
+CROSS_CATEGORIES = {
+            'Burger': ['Fries', 'Coke'],
+            'Sandwich': ['Soda', 'Soft Drink'],
+            'Salad': ['Protein (Chicken/Meat)'],
+            'Snack': ['Snack', 'Soda/Soft Drink'],
+            'Meal': ['Coke', 'Soda'],
+            'Wrap': ['Juice'],
+            'Smoothie': ['Fruit'],
+            'Burrito': ['Side'],
+            'Cold Coffee': ['Pastry'],
+            'Cereal': ['Milk'],
+            'Apparel': ['Bags'],
+            'Platter': ['Drink'],
+        }
+
+TIME_SLOTS = {
+            'Breakfast': [5, 12],
+            'Breakfast/Lunch': [5, 18],
+            'Lunch': [12, 18],
+            'Lunch/Dinner': [12, 23],
+            'Dinner': [18, 23]
+        }
+
+MAX_SUBCATEGORY_LIMIT = 3

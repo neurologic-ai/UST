@@ -1,5 +1,3 @@
-
-
 import bcrypt
 from loguru import logger
 from db.singleton import get_engine, ping,close_connection

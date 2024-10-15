@@ -21,7 +21,7 @@ for idx, row in df_categories.iterrows():
     scat1 = row['Subcategory']
     scat2 = row['Subcategory2']
     scat3 = row['Subcategory3']
-    categories_dct[p_n.strip()] = Product(p_n.strip(), cat, scat1, scat2, scat3)
+    categories_dct[str(p_n).strip()] = Product(str(p_n).strip(), cat, scat1, scat2, scat3)
 
 class Aggregation:
     def __init__(self, reco_list, cart_items, categories, current_hour = 12):

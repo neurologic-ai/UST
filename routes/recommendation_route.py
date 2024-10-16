@@ -26,6 +26,31 @@ async def get_data(
     data= await db.find(Association_collection)
     return data
 
+@router.post("/setup")
+async def upload_csvs(
+    processed: UploadFile = File(...), 
+    categories: UploadFile = File(...)
+):
+    # Read both files into pandas DataFrames
+    df1 = pd.read_csv(processed.file)
+    df2 = pd.read_csv(categories.file)
+    # Lets see is the input files are in correct format
+    validation = validate(df1, df2)
+    if not validation:
+        print(f"Error: Validation failed, please try again with correct data format.")
+        return {"Error": "Validation failed, please try again with correct data format."}
+
+    # Store the input files
+    df1.to_csv(PROCESSED_PATH, index = False)
+    df2.to_csv(CATEGORY_PATH, index = False)
+    print("Data is stored successfully")
+    try:
+        run_models_and_store_outputs()
+    except:
+        return {"Error": "Failed to run the recomendation model."}
+    
+    # Return the shape as a JSON response
+    return {"message": "Set up has been completed, now you can safely run the recommendation API."}
 
 @router.post("/recommendation")
 async def recommendation(
@@ -79,31 +104,4 @@ async def recommendation(
     return final_recommendations
 
 from fastapi import FastAPI, UploadFile, File
-import pandas as pd 
-# pip install python-multipart
-
-@router.post("/setup")
-async def upload_csvs(
-    processed: UploadFile = File(...), 
-    categories: UploadFile = File(...)
-):
-    # Read both files into pandas DataFrames
-    df1 = pd.read_csv(processed.file)
-    df2 = pd.read_csv(categories.file)
-    # Lets see is the input files are in correct format
-    validation = validate(df1, df2)
-    if not validation:
-        print(f"Error: Validation failed, please try again with correct data format.")
-        return {"Error": "Validation failed, please try again with correct data format."}
-
-    # Store the input files
-    df1.to_csv(PROCESSED_PATH, index = False)
-    df2.to_csv(CATEGORY_PATH, index = False)
-    print("Data is stored successfully")
-    try:
-        run_models_and_store_outputs()
-    except:
-        return {"Error": "Failed to run the recomendation model."}
-    
-    # Return the shape as a JSON response
-    return {"message": "Set up has been completed, now you can safely run the recommendation API."}
+import pandas as pd

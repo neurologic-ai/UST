@@ -60,4 +60,4 @@ def run_models_and_store_outputs():
         print(f"Error in preparing or inserting association-based recommendation data: {str(e)}")
         return
 
-run_models_and_store_outputs()
+# run_models_and_store_outputs() # Need to remove this 

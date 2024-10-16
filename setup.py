@@ -1,5 +1,4 @@
 import pandas as pd
-from initial.data_validation import validate
 from initial.models import popular_based, time_based, calendar_based, association_based, weather_based
 from initial.constant import PROCESSED_DATA_PATH
 from utils.helper import insert_data
@@ -7,10 +6,6 @@ from db.singleton import popular_collection_name, time_collection_name, weather_
 
 
 def run_models_and_store_outputs():
-    validation = validate()
-    if not validation:
-        print(f"Error: Validation failed, please try again later with correct data format.")
-        return 
     try:
         df = pd.read_csv(PROCESSED_DATA_PATH)
     except FileNotFoundError:

@@ -15,6 +15,8 @@ from utils.helper import get_association_recommendations, get_calendar_recommend
 from configs.constant import PROCESSED_PATH, CATEGORY_PATH
 from initial.data_validation import validate
 from setup import run_models_and_store_outputs
+from fastapi import UploadFile, File
+import pandas as pd
 
 router = APIRouter()
 
@@ -102,6 +104,3 @@ async def recommendation(
     aggregator = Aggregation(all_recommendations, cart_items, categories_dct, current_hr)
     final_recommendations = aggregator.get_final_recommendations()
     return final_recommendations
-
-from fastapi import FastAPI, UploadFile, File
-import pandas as pd

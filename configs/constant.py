@@ -36,3 +36,6 @@ TIME_SLOTS = {
         }
 
 MAX_SUBCATEGORY_LIMIT = 3
+
+CATEGORY_PATH = "db/Categories.csv"
+PROCESSED_PATH = "initial/Data/processed.csv"

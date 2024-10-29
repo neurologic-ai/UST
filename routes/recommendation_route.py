@@ -1,5 +1,6 @@
 import asyncio
-from fastapi import APIRouter, Depends, logger
+from http.client import HTTPResponse
+from fastapi import APIRouter, Depends, logger, HTTPException
 from fastapi.encoders import jsonable_encoder
 from bson.json_util import dumps
 from collections import defaultdict
@@ -60,6 +61,8 @@ async def recommendation(
     athorize:bool=Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
+    if not athorize:
+        return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
     # Required inputs
     ######################################
     final_top_n = data.top_n

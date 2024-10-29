@@ -28,10 +28,10 @@ CROSS_CATEGORIES = {
         }
 
 TIME_SLOTS = {
-            'Breakfast': [5, 10],
+            'Breakfast': [5, 12],
             'Breakfast/Lunch': [5, 18],
-            'Lunch': [10, 18],
-            'Lunch/Dinner': [10, 23],
+            'Lunch': [12, 18],
+            'Lunch/Dinner': [12, 23],
             'Dinner': [18, 23]
         }
 

@@ -57,12 +57,13 @@ async def upload_csvs(
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    # athorize:bool=Depends(PermissionChecker(['items:read'])),
+    athorize:bool=Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
     # Required inputs
     ######################################
-    top_n = data.top_n
+    final_top_n = data.top_n
+    top_n = 100
     cart_items = data.cart_items
     current_hr = data.current_hr
     current_dayofweek = data.current_dayofweek
@@ -103,4 +104,4 @@ async def recommendation(
     # Return final recommendations
     aggregator = Aggregation(all_recommendations, cart_items, categories_dct, current_hr)
     final_recommendations = aggregator.get_final_recommendations()
-    return final_recommendations
+    return final_recommendations[:final_top_n]

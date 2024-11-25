@@ -96,13 +96,13 @@ class Aggregation:
             prioritized_items = [p for p in self.reco_list 
                                  if self.categories[p.strip()].subcategory1 in self.cross_subcategories[cart_subcat1]]
             
-            print('Product name', 'Subcategory')
+            # print('Product name', 'Subcategory')
             # for prod in self.reco_list:
             #     print(f"{prod}: {self.categories[prod.strip()].subcategory1}")
 
             # print(f"Recommendation list: {self.reco_list}")
             # print(f"Priorotize list: {prioritized_items}")
-            print('Product name', 'Subcategory')
+            # print('Product name', 'Subcategory')
             # for prod in prioritized_items:
             #     print(f"{prod}: {self.categories[prod.strip()].subcategory1}")
 

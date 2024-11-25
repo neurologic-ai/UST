@@ -8,7 +8,7 @@ async def get_association_recommendations(engine: AIOEngine, cart_items: list, t
     assoc_products = {}
     if cart_items:
         for product in cart_items:
-            assoc_recommendation = await engine.find_one(collection_name, collection_name.product == product)
+            assoc_recommendation = await engine.find_one(collection_name, {"product": product})
             if assoc_recommendation:
                 assoc_products.update(assoc_recommendation.associate_products)
     return list(assoc_products.keys())[:top_n]

@@ -23,13 +23,13 @@ from initialize.helper import get_timing
 router = APIRouter()
 
 
-# @router.get("/view data")
-# async def get_data(
-#     db: AIOEngine = Depends(get_engine)
-# ):
+@router.get("/view data")
+async def get_data(
+    db: AIOEngine = Depends(get_engine)
+):
    
-#     data = await db.find(Association_collection)
-#     return data
+    data = await db.find(BreakfastPopular)
+    return data
 
 
 @router.post("/setup")
@@ -78,10 +78,8 @@ async def recommendation(
     current_holiday = data.current_holiday
 
     ######################################
-    # Initialize a dictionary to track the count of product appearances across all sources
-    product_count = defaultdict(int)
-
     timing_category = get_timing(current_hr, TIME_SLOTS)
+    print(timing_category)
     # Gather all recommendations concurrently
     if timing_category == 'Breakfast':
         popular_recommendations, assoc_recommendations  = await asyncio.gather(
@@ -104,20 +102,14 @@ async def recommendation(
             get_association_recommendations(db, cart_items, top_n, OtherAssociation)
         )
 
-    # Aggregate product counts from recommendations
-    for product in assoc_recommendations:
-        product_count[product] += 1
-    for product in popular_recommendations:
-        product_count[product] += 1
+    aggregator = Aggregation(popular_recommendations, cart_items, categories_dct, current_hr)
+    filtered_popular_recommendation = aggregator.get_final_recommendations()
 
-    # Sort products by their appearance count across all sources
-    sorted_products = sorted(product_count.items(), key = lambda x: x[1], reverse = True)
+    aggregator = Aggregation(assoc_recommendations, cart_items, categories_dct, current_hr)
+    filtered_assoc_recommendation = aggregator.get_final_recommendations()
 
-    # Extract only the product names (not the counts) and take the top_n
-    all_recommendations = [product for product, _ in sorted_products][:top_n]
-
-    # Return final recommendations
-    aggregator = Aggregation(all_recommendations, cart_items,    categories_dct, current_hr)
-    final_recommendations = aggregator.get_final_recommendations()
-    # print(timing_category)
-    return popular_recommendations[:final_top_n]
+    if len(filtered_assoc_recommendation) == 0:
+        final_recommendation = {"message" : "Popular Recommendation", "Recommended Items": filtered_popular_recommendation[:final_top_n]}
+    else:
+        final_recommendation = {"message" : "Associate Recommendation", "Recommended Items": filtered_assoc_recommendation[:final_top_n]}
+    return final_recommendation

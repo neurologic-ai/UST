@@ -45,7 +45,7 @@ class BreakfastAssociation(Model):
     associate_products: Dict[str, int]
 
     model_config = {
-        "collection": "breakfast_popular_collection"
+        "collection": "breakfast_association_collection"
     }
 
 class LunchAssociation(Model):
@@ -53,7 +53,7 @@ class LunchAssociation(Model):
     associate_products: Dict[str, int]
 
     model_config = {
-        "collection": "lunch_popular_collection"
+        "collection": "lunch_association_collection"
     }
 
 class DinnerAssociation(Model):
@@ -61,7 +61,7 @@ class DinnerAssociation(Model):
     associate_products: Dict[str, int]
 
     model_config = {
-        "collection": "dinner_popular_collection"
+        "collection": "dinner_association_collection"
     }
 
 class OtherAssociation(Model):
@@ -69,5 +69,5 @@ class OtherAssociation(Model):
     associate_products: Dict[str, int]
 
     model_config = {
-        "collection": "other_popular_collection"
+        "collection": "other_association_collection"
     }

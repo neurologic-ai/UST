@@ -1,6 +1,6 @@
 
 from odmantic import Model
-from typing import Dict, List
+from typing import Dict
 
 class User(Model):
     username: str
@@ -11,45 +11,63 @@ class User(Model):
         "collection": "user_collection"
     }
 
-    
 
-class Association_collection(Model):
+class BreakfastPopular(Model):
+    popular_data: Dict[str, int]
+
+    model_config = {
+        "collection": "breakfast_popular_collection"
+    }
+
+class LunchPopular(Model):
+    popular_data: Dict[str, int]
+
+    model_config = {
+        "collection": "lunch_popular_collection"
+    }
+
+class DinnerPopular(Model):
+    popular_data: Dict[str, int]
+
+    model_config = {
+        "collection": "dinner_popular_collection"
+    }
+
+class OtherPopular(Model):
+    popular_data: Dict[str, int]
+
+    model_config = {
+        "collection": "other_popular_collection"
+    }
+    
+class BreakfastAssociation(Model):
     product: str
     associate_products: Dict[str, int]
 
     model_config = {
-        "collection": "association_collection"
+        "collection": "breakfast_popular_collection"
     }
 
-class Popular_collection(Model):
-    popular_data: Dict[str, int]
+class LunchAssociation(Model):
+    product: str
+    associate_products: Dict[str, int]
 
     model_config = {
-        "collection": "popular_collection"
+        "collection": "lunch_popular_collection"
     }
 
-class Time_collection(Model):
-    hour: int
-    dayofweek: int
-    recommended_products: List[str]
+class DinnerAssociation(Model):
+    product: str
+    associate_products: Dict[str, int]
 
     model_config = {
-        "collection": "time_collection"
+        "collection": "dinner_popular_collection"
     }
 
-class Weather_collection(Model):
-    category: str
-    products: List[str]
+class OtherAssociation(Model):
+    product: str
+    associate_products: Dict[str, int]
 
     model_config = {
-        "collection": "weather_collection"
+        "collection": "other_popular_collection"
     }
-
-class Calendar_collection(Model):
-    holiday: str
-    products: List[str]
-
-    model_config = {
-        "collection": "calendar_collection"
-    }
-

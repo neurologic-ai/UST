@@ -9,25 +9,28 @@ from fastapi.responses import JSONResponse
 from odmantic import AIOEngine
 from models.schema import RecommendationRequestBody
 from models.hepler import categories_dct, Aggregation
-from db.singleton import get_engine
-from models.db import Association_collection
+from db.singleton import get_engine, breakfast_association_collection_name, breakfast_popular_collection_name
 from routes.user_route import PermissionChecker
-from utils.helper import get_association_recommendations, get_calendar_recommendation, get_popular_recommendation, get_time_recommendation, get_weather_recommendation
-from configs.constant import PROCESSED_PATH, CATEGORY_PATH
-from initial.data_validation import validate
+from utils.helper import get_association_recommendations, get_popular_recommendation
+from configs.constant import PROCESSED_DATA_PATH, CATEGORY_PATH, TIME_SLOTS
+from initialize.data_validation import validate
 from setup import run_models_and_store_outputs
 from fastapi import UploadFile, File
 import pandas as pd
+from models.db import BreakfastPopular, LunchPopular, DinnerPopular, OtherPopular, BreakfastAssociation, LunchAssociation, DinnerAssociation, OtherAssociation
+from initialize.helper import get_timing
 
 router = APIRouter()
 
-@router.get("/view data")
-async def get_data(
-    db: AIOEngine = Depends(get_engine)
-):
+
+# @router.get("/view data")
+# async def get_data(
+#     db: AIOEngine = Depends(get_engine)
+# ):
    
-    data= await db.find(Association_collection)
-    return data
+#     data = await db.find(Association_collection)
+#     return data
+
 
 @router.post("/setup")
 async def upload_csvs(
@@ -44,7 +47,7 @@ async def upload_csvs(
         return {"Error": "Validation failed, please try again with correct data format."}
 
     # Store the input files
-    df1.to_csv(PROCESSED_PATH, index = False)
+    df1.to_csv(PROCESSED_DATA_PATH, index = False)
     df2.to_csv(CATEGORY_PATH, index = False)
     print("Data is stored successfully")
     try:
@@ -55,14 +58,15 @@ async def upload_csvs(
     # Return the shape as a JSON response
     return {"message": "Set up has been completed, now you can safely run the recommendation API."}
 
+
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    athorize:bool=Depends(PermissionChecker(['items:read'])),
+    # athorize:bool=Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
-    if not athorize:
-        return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
+    # if not athorize:
+    #     return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
     # Required inputs
     ######################################
     final_top_n = data.top_n
@@ -77,23 +81,31 @@ async def recommendation(
     # Initialize a dictionary to track the count of product appearances across all sources
     product_count = defaultdict(int)
 
+    timing_category = get_timing(current_hr, TIME_SLOTS)
     # Gather all recommendations concurrently
-    time_recommendations, weather_recommendations, calendar_recommendations, assoc_recommendations, popular_recommendations = await asyncio.gather(
-        get_time_recommendation(db, current_hr, current_dayofweek, top_n),
-        get_weather_recommendation(db, current_weather_category, top_n),
-        get_calendar_recommendation(db, current_holiday, top_n),
-        get_association_recommendations(db, cart_items, top_n),
-        get_popular_recommendation(db, top_n)
-    )
+    if timing_category == 'Breakfast':
+        popular_recommendations, assoc_recommendations  = await asyncio.gather(
+            get_popular_recommendation(db, top_n, BreakfastPopular),
+            get_association_recommendations(db, cart_items, top_n, BreakfastAssociation)
+        )
+    elif timing_category == 'Lunch':
+        popular_recommendations, assoc_recommendations  = await asyncio.gather(
+            get_popular_recommendation(db, top_n, LunchPopular),
+            get_association_recommendations(db, cart_items, top_n, LunchAssociation)
+        )
+    elif timing_category == 'Dinner':
+        popular_recommendations, assoc_recommendations  = await asyncio.gather(
+            get_popular_recommendation(db, top_n, DinnerPopular),
+            get_association_recommendations(db, cart_items, top_n, DinnerAssociation)
+        )
+    elif timing_category == 'Other':
+        popular_recommendations, assoc_recommendations  = await asyncio.gather(
+            get_popular_recommendation(db, top_n, OtherPopular),
+            get_association_recommendations(db, cart_items, top_n, OtherAssociation)
+        )
 
     # Aggregate product counts from recommendations
     for product in assoc_recommendations:
-        product_count[product] += 1
-    for product in weather_recommendations:
-        product_count[product] += 1
-    for product in time_recommendations:
-        product_count[product] += 1
-    for product in calendar_recommendations:
         product_count[product] += 1
     for product in popular_recommendations:
         product_count[product] += 1
@@ -105,6 +117,7 @@ async def recommendation(
     all_recommendations = [product for product, _ in sorted_products][:top_n]
 
     # Return final recommendations
-    aggregator = Aggregation(all_recommendations, cart_items, categories_dct, current_hr)
+    aggregator = Aggregation(all_recommendations, cart_items,    categories_dct, current_hr)
     final_recommendations = aggregator.get_final_recommendations()
-    return final_recommendations[:final_top_n]
+    # print(timing_category)
+    return popular_recommendations[:final_top_n]

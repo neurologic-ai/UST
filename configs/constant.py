@@ -1,3 +1,33 @@
+PROCESSED_DATA_PATH = "initialize/Data/processed.csv" # During the deployment we can store it to cloud storage
+CATEGORY_PATH = "db/Categories.csv"
+GREEN = '\033[92m'
+RED = '\033[91m'
+RESET = '\033[0m'
+
+EXPECTED_PROCESSED_COLS = {
+    'Session_id': 'int64',
+    'Date_time': 'object',
+    'Product_name': 'object',
+    'Quantity': 'int64',
+}
+
+SHOP_LOCATION = 'Jackson Hole Airport'
+
+SESSION_COL = 'Session_id'
+DATE_COL = 'Datetime'
+PRODUCT_NAME_COL = 'Product_name'
+QUANTITY_COL = 'Quantity'
+TIMINGS_COL = 'Timing'
+
+EXPECTED_CATEGORY_COLS = {
+    'Product_name': 'object',
+    'Category': 'object',
+    'Subcategory': 'object',
+    'Subcategory2': 'object',
+    'Subcategory2' : 'object'
+}
+
+
 EXCLUDE_SUBCATEGORIES = ['Water']#, 'Coffee/Tea']
 
 STRICT_CATEGORY_RULES = {
@@ -28,14 +58,14 @@ CROSS_CATEGORIES = {
         }
 
 TIME_SLOTS = {
-            'Breakfast': [5, 12],
-            'Breakfast/Lunch': [5, 18],
-            'Lunch': [12, 18],
-            'Lunch/Dinner': [12, 23],
-            'Dinner': [18, 23]
+            'Breakfast': (5, 12),
+            'Breakfast/Lunch': (5, 16),
+            'Lunch': (12, 16),
+            'Lunch/Dinner': (12, 24),
+            'Dinner': (16, 24),
+            'Other': (24, 5)
         }
 
-MAX_SUBCATEGORY_LIMIT = 3
+TIMINGS = ['Breakfast', 'Lunch', 'Dinner', 'Other']
 
-CATEGORY_PATH = "db/Categories.csv"
-PROCESSED_PATH = "initial/Data/processed.csv"
+MAX_SUBCATEGORY_LIMIT = 3

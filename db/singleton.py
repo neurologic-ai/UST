@@ -17,7 +17,7 @@ class _MongoClientSingleton:
         if not hasattr(cls, "instance"):
             cls.instance = super(_MongoClientSingleton, cls).__new__(cls)
             cls.instance.mongo_client = motor_asyncio.AsyncIOMotorClient(
-                settings.MONGO_URI, driver=DRIVER_INFO
+                settings.MONGO_URI, driver = DRIVER_INFO
             )
             cls.instance.engine = AIOEngine(client=cls.instance.mongo_client, database=settings.DB_NAME)
         return cls.instance 
@@ -38,10 +38,14 @@ async def close_connection():
     await _MongoClientSingleton().mongo_client.close()
 
 
-popular_collection_name = MongoDatabase()['popular_collection']
-time_collection_name = MongoDatabase()['time_collection']
-weather_collection_name = MongoDatabase()['weather_collection']
-calendar_collection_name = MongoDatabase()['calendar_collection']
-association_collection_name = MongoDatabase()['association_collection']
+breakfast_association_collection_name = MongoDatabase()['breakfast_association_collection']
+lunch_association_collection_name = MongoDatabase()['lunch_association_collection']
+dinner_association_collection_name = MongoDatabase()['dinner_association_collection']
+other_association_collection_name = MongoDatabase()['other_association_collection']
 
-__all__ = ["MongoDatabase", "get_engine","ping", "close_connection","popular_collection_name", "time_collection_name", "weather_collection_name", "calendar_collection_name", "association_collection_name"]
+breakfast_popular_collection_name = MongoDatabase()['breakfast_popular_collection']
+lunch_popular_collection_name = MongoDatabase()['lunch_popular_collection']
+dinner_popular_collection_name = MongoDatabase()['dinner_popular_collection']
+other_popular_collection_name = MongoDatabase()['other_popular_collection']
+
+#__all__ = ["MongoDatabase", "get_engine","ping", "close_connection","popular_collection_name", "time_collection_name", "weather_collection_name", "calendar_collection_name", "association_collection_name"]

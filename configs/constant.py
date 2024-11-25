@@ -24,37 +24,38 @@ EXPECTED_CATEGORY_COLS = {
     'Category': 'object',
     'Subcategory': 'object',
     'Subcategory2': 'object',
-    'Subcategory2' : 'object'
+    'Subcategory3' : 'object'
 }
 
 
-EXCLUDE_SUBCATEGORIES = ['Water']#, 'Coffee/Tea']
+EXCLUDE_SUBCATEGORIES = []#'water']
 
 STRICT_CATEGORY_RULES = {
-            'Food': ['Home Decor', 'Cloths', 'Personal Care', 'Medicine', 'Toys', 'Reading'],
-            'Beverage': ['Home Decor', 'Cloths', 'Personal Care', 'Medicine', 'Toys', 'Reading'],
-            'Medicine': ['Home Decor', 'Cloths', 'Personal Care', 'Toys'],
-            'Toys': ['Medicine']
+            'food': ['home decor', 'cloths', 'personal Care', 'medicine', 'toys'],
+            'beverage': ['home decor', 'cloths', 'personal Care', 'medicine', 'toys'],
+            'medicine': ['home Decor', 'cloths', 'personal Care', 'toys'],
+            'toys': ['medicine']
         }
 
 MONO_CATEGORIES = [
-            'Water', 'Juice', 'Coffee/Tea', 'Soda/Soft Drink', 'Smoothie', 'Fries', 
-            'Protein Drinks', 'Cold Coffee', 'Cereal', 'Pastry', 'Condiments', 'Dairy', 'Burgers', 'Coke'
+            'water', 'juice', 'coffee/tea', 'soda', 'soft drink', 'smoothie', 'fries', 
+            'protein drinks', 'cold coffee', 'cereal', 'pastry', 'condiments', 'burgers', 'coke', 'milk'
         ]
 
 CROSS_CATEGORIES = {
-            'Burger': ['Fries', 'Coke'],
-            'Sandwich': ['Soda', 'Soft Drink'],
-            'Salad': ['Protein (Chicken/Meat)'],
-            'Snack': ['Snack', 'Soda/Soft Drink'],
-            'Meal': ['Coke', 'Soda'],
-            'Wrap': ['Juice'],
-            'Smoothie': ['Fruit'],
-            'Burrito': ['Side'],
-            'Cold Coffee': ['Pastry'],
-            'Cereal': ['Milk'],
-            'Apparel': ['Bags'],
-            'Platter': ['Drink'],
+            'burger': ['french fries', 'fries', 'coke'],
+            'sandwich': ['coffee', 'tea', 'juice', 'coffee/tea', 'soda', 'soft drink'],
+            'salad': ['protein'],
+            'snack': ['snack', 'soda', 'soft drink'],
+            'meal': ['coke', 'soda', 'coffee', 'tea', 'juice', 'coffee/tea', 'soft drink'],
+            'wrap': ['juice', 'coffee', 'tea', 'coffee/tea'],
+            'smoothie': ['fruit', 'water'],
+            'burrito': ['coffee', 'juice', 'tea', 'coffee/tea', 'side', 'soft drink'],
+            'cold coffee': ['pastry'],
+            'cereal': ['milk', 'coffee', 'tea', 'coffee/tea'],
+            'apparel': ['bags'],
+            'platter': ['soft drink', 'soda'],
+            'medicine': ['water', 'juice']
         }
 
 TIME_SLOTS = {
@@ -68,4 +69,4 @@ TIME_SLOTS = {
 
 TIMINGS = ['Breakfast', 'Lunch', 'Dinner', 'Other']
 
-MAX_SUBCATEGORY_LIMIT = 3
+MAX_SUBCATEGORY_LIMIT = 1

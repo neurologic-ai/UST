@@ -1,4 +1,3 @@
-
 from odmantic import Model
 from typing import Dict
 

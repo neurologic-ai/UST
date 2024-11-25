@@ -95,6 +95,17 @@ class Aggregation:
         if cart_subcat1 in self.cross_subcategories:
             prioritized_items = [p for p in self.reco_list 
                                  if self.categories[p.strip()].subcategory1 in self.cross_subcategories[cart_subcat1]]
+            
+            print('Product name', 'Subcategory')
+            # for prod in self.reco_list:
+            #     print(f"{prod}: {self.categories[prod.strip()].subcategory1}")
+
+            # print(f"Recommendation list: {self.reco_list}")
+            # print(f"Priorotize list: {prioritized_items}")
+            print('Product name', 'Subcategory')
+            # for prod in prioritized_items:
+            #     print(f"{prod}: {self.categories[prod.strip()].subcategory1}")
+
             self.reco_list = prioritized_items + [item for item in self.reco_list if item not in prioritized_items]
 
     def limit_same_category_occurrences(self):
@@ -109,6 +120,9 @@ class Aggregation:
                 refined_list.append(p)
 
         self.reco_list = refined_list
+    
+    def exclude_shorter_product_names(self):
+        self.reco_list = [item for item in self.reco_list if len(item) > 1]
 
     def get_final_recommendations(self):
         """Execute all filtering and return the final list of recommended products."""
@@ -117,4 +131,5 @@ class Aggregation:
         self.remove_non_timely_products()
         self.prioritize_associations()
         self.limit_same_category_occurrences()
+        self.exclude_shorter_product_names()
         return self.reco_list

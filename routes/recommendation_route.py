@@ -1,15 +1,10 @@
 import asyncio
-from http.client import HTTPResponse
-from fastapi import APIRouter, Depends, logger, HTTPException
-from fastapi.encoders import jsonable_encoder
-from bson.json_util import dumps
-from collections import defaultdict
+from fastapi import APIRouter, Depends, HTTPException
 
-from fastapi.responses import JSONResponse
 from odmantic import AIOEngine
 from models.schema import RecommendationRequestBody
 from models.hepler import categories_dct, Aggregation
-from db.singleton import get_engine, breakfast_association_collection_name, breakfast_popular_collection_name
+from db.singleton import get_engine
 from routes.user_route import PermissionChecker
 from utils.helper import get_association_recommendations, get_popular_recommendation
 from configs.constant import PROCESSED_DATA_PATH, CATEGORY_PATH, TIME_SLOTS
@@ -67,10 +62,10 @@ async def recommendation(
 ):
     # if not athorize:
     #     return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
-    # Required inputs
     ######################################
     final_top_n = data.top_n
-    top_n = 100
+    top_n = final_top_n + 30
+
     cart_items = data.cart_items
     current_hr = data.current_hr
     current_dayofweek = data.current_dayofweek
@@ -79,7 +74,6 @@ async def recommendation(
 
     ######################################
     timing_category = get_timing(current_hr, TIME_SLOTS)
-    print(timing_category)
     # Gather all recommendations concurrently
     if timing_category == 'Breakfast':
         popular_recommendations, assoc_recommendations  = await asyncio.gather(

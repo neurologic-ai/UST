@@ -1,12 +1,12 @@
 PROCESSED_DATA_PATH = "initialize/Data/processed.csv" # During the deployment we can store it to cloud storage
-CATEGORY_PATH = "db/Categories.csv"
+CATEGORY_DATA_PATH = "db/New_categories.csv"
 GREEN = '\033[92m'
 RED = '\033[91m'
 RESET = '\033[0m'
 
 EXPECTED_PROCESSED_COLS = {
     'Session_id': 'int64',
-    'Date_time': 'object',
+    'Datetime': 'object',
     'Product_name': 'object',
     'Quantity': 'int64',
 }
@@ -23,12 +23,11 @@ EXPECTED_CATEGORY_COLS = {
     'Product_name': 'object',
     'Category': 'object',
     'Subcategory': 'object',
-    'Subcategory2': 'object',
-    'Subcategory3' : 'object'
+    'Timing': 'object'
 }
 
 
-EXCLUDE_SUBCATEGORIES = []#'water']
+EXCLUDE_SUBCATEGORIES = ['water']
 
 STRICT_CATEGORY_RULES = {
             'food': ['home decor', 'cloths', 'personal Care', 'medicine', 'toys'],
@@ -44,18 +43,25 @@ MONO_CATEGORIES = [
 
 CROSS_CATEGORIES = {
             'burger': ['french fries', 'fries', 'coke'],
-            'sandwich': ['coffee', 'tea', 'juice', 'coffee/tea', 'soda', 'soft drink'],
-            'salad': ['protein'],
-            'snack': ['snack', 'soda', 'soft drink'],
-            'meal': ['coke', 'soda', 'coffee', 'tea', 'juice', 'coffee/tea', 'soft drink'],
-            'wrap': ['juice', 'coffee', 'tea', 'coffee/tea'],
+            'sandwich': ['juice', 'coffee/tea', 'soda'],
+            'salad': ['soup', 'juice'],
+            'snack': ['snack', 'soda'],
+            'meal': ['soda', 'juice', 'coffee/tea', 'soft drink', 'ice cream'],
+            'wrap': ['juice', 'coffee/tea'],
             'smoothie': ['fruit', 'water'],
-            'burrito': ['coffee', 'juice', 'tea', 'coffee/tea', 'side', 'soft drink'],
-            'cold coffee': ['pastry'],
-            'cereal': ['milk', 'coffee', 'tea', 'coffee/tea'],
+            'burrito': ['coffee', 'juice', 'side', 'soft drink'],
+            'coffee/tea': ['pastry', 'cookies', 'chips', 'chip', 'rings', 'crackers', 'pretzels', 'Protein Bar'],
+            'cereal': ['milk', 'coffee/tea', 'yogurt'],
             'apparel': ['bags'],
             'platter': ['soft drink', 'soda'],
-            'medicine': ['water', 'juice']
+            'medicine': ['water', 'juice'],
+            'toast' : ['juice', 'coffee/tea'],
+            'soup': ['bread'],
+            'fruit': ['nuts'],
+            'chips': ['dip', 'soda'],
+            'bread': ['butter', 'jam'],
+            'soda': ['chips', 'chip', 'rings', 'crackers', 'pretzels', 'chocolate'],
+            'candy':['candy', 'chocolate', 'chips', 'crackers', 'chip', 'pretzels', 'cake']
         }
 
 TIME_SLOTS = {

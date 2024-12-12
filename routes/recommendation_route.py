@@ -7,7 +7,7 @@ from models.hepler import categories_dct, Aggregation
 from db.singleton import get_engine
 from routes.user_route import PermissionChecker
 from utils.helper import get_association_recommendations, get_popular_recommendation
-from configs.constant import PROCESSED_DATA_PATH, CATEGORY_PATH, TIME_SLOTS
+from configs.constant import PROCESSED_DATA_PATH, CATEGORY_DATA_PATH, TIME_SLOTS
 from initialize.data_validation import validate
 from setup import run_models_and_store_outputs
 from fastapi import UploadFile, File
@@ -43,7 +43,7 @@ async def upload_csvs(
 
     # Store the input files
     df1.to_csv(PROCESSED_DATA_PATH, index = False)
-    df2.to_csv(CATEGORY_PATH, index = False)
+    df2.to_csv(CATEGORY_DATA_PATH, index = False)
     print("Data is stored successfully")
     try:
         run_models_and_store_outputs()
@@ -64,13 +64,13 @@ async def recommendation(
     #     return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
     ######################################
     final_top_n = data.top_n
-    top_n = final_top_n + 30
+    top_n = final_top_n + 50
 
-    cart_items = data.cart_items
+    cart_items = [item.strip().lower() for item in data.cart_items]
     current_hr = data.current_hr
-    current_dayofweek = data.current_dayofweek
-    current_weather_category = data.current_weather_category
-    current_holiday = data.current_holiday
+    # current_dayofweek = data.current_dayofweek
+    # current_weather_category = data.current_weather_category
+    # current_holiday = data.current_holiday
 
     ######################################
     timing_category = get_timing(current_hr, TIME_SLOTS)
@@ -105,5 +105,5 @@ async def recommendation(
     if len(filtered_assoc_recommendation) == 0:
         final_recommendation = {"message" : "Popular Recommendation", "Recommended Items": filtered_popular_recommendation[:final_top_n]}
     else:
-        final_recommendation = {"message" : "Associate Recommendation", "Recommended Items": filtered_assoc_recommendation[:final_top_n]}
+        final_recommendation = {"message" : "Association Recommendation", "Recommended Items": filtered_assoc_recommendation[:final_top_n]}
     return final_recommendation

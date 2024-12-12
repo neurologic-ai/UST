@@ -7,9 +7,9 @@ from typing import Any
 class RecommendationRequestBody(BaseModel):
     cart_items: List
     current_hr: int
-    current_dayofweek: int
-    current_weather_category: str
-    current_holiday: str
+    # current_dayofweek: int
+    # current_weather_category: str
+    # current_holiday: str
     top_n: int
 
 class UserBase(BaseModel):

@@ -1,6 +1,4 @@
 from odmantic import AIOEngine
-# from models.db import AssociationCollection, PopularCollection
-
 
 # Define async functions for each recommendation source
 

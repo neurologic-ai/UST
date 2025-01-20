@@ -57,11 +57,11 @@ async def upload_csvs(
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    # athorize:bool=Depends(PermissionChecker(['items:read'])),
+    athorize:bool=Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
-    # if not athorize:
-    #     return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
+    if not athorize:
+        return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
     ######################################
     final_top_n = data.top_n
     top_n = final_top_n + 50

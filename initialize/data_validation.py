@@ -1,4 +1,3 @@
-import pandas as pd
 from configs.constant import  GREEN, RED, RESET, EXPECTED_PROCESSED_COLS, EXPECTED_CATEGORY_COLS
 
 def validate(df1, df2):

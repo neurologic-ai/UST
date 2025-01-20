@@ -48,4 +48,15 @@ lunch_popular_collection_name = MongoDatabase()['lunch_popular_collection']
 dinner_popular_collection_name = MongoDatabase()['dinner_popular_collection']
 other_popular_collection_name = MongoDatabase()['other_popular_collection']
 
-#__all__ = ["MongoDatabase", "get_engine","ping", "close_connection","popular_collection_name", "time_collection_name", "weather_collection_name", "calendar_collection_name", "association_collection_name"]
+__all__ = ["MongoDatabase", 
+           "get_engine",
+           "ping", 
+           "close_connection",
+           "breakfast_association_collection_name",
+           "lunch_association_collection_name",
+           "dinner_association_collection_name",
+           "other_association_collection_name",
+           "breakfast_popular_collection_name",
+           "lunch_popular_collection_name",
+           "dinner_popular_collection_name",
+           "other_popular_collection_name"]

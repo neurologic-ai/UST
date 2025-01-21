@@ -6,7 +6,7 @@ class BackendBaseSettings(BaseSettings):
     
     MONGO_URI: str = decouple.config("MONGO_URI")
     DB_NAME: str = decouple.config("DB_NAME") 
-    CATEGORY_DATA_LOCATION: str = decouple.config("CATEGORY_DATA_LOCATION") 
+    # CATEGORY_DATA_LOCATION: str = decouple.config("CATEGORY_DATA_LOCATION") 
     
     IS_ALLOWED_CREDENTIALS: bool = True
     # get the list of allowed origins from the environment variable

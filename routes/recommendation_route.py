@@ -20,9 +20,11 @@ router = APIRouter()
 
 @router.get("/view data")
 async def get_data(
-    db: AIOEngine = Depends(get_engine)
+    db: AIOEngine = Depends(get_engine),
+    athorize:bool = Depends(PermissionChecker(['items:read'])),
 ):
-   
+    if not athorize:
+            return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
     data = await db.find(BreakfastPopular)
     return data
 
@@ -30,8 +32,11 @@ async def get_data(
 @router.post("/setup")
 async def upload_csvs(
     processed: UploadFile = File(...), 
-    categories: UploadFile = File(...)
+    categories: UploadFile = File(...),
+    athorize:bool = Depends(PermissionChecker(['items:read', 'items:write'])),
 ):
+    if not athorize:
+            return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
     # Read both files into pandas DataFrames
     df1 = pd.read_csv(processed.file)
     df2 = pd.read_csv(categories.file)
@@ -57,7 +62,7 @@ async def upload_csvs(
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    athorize:bool=Depends(PermissionChecker(['items:read'])),
+    athorize:bool = Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
     if not athorize:

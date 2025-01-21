@@ -1,5 +1,5 @@
 PROCESSED_DATA_PATH = "initialize/Data/processed.csv" # During the deployment we can store it to cloud storage
-CATEGORY_DATA_PATH = "db/New_categories.csv"
+CATEGORY_DATA_PATH = "db/categories.csv"
 GREEN = '\033[92m'
 RED = '\033[91m'
 RESET = '\033[0m'

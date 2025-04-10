@@ -5,12 +5,12 @@ from typing import Any
 
 
 class RecommendationRequestBody(BaseModel):
-    cart_items: List = ['coke']
-    current_hr: int = 17
+    cartItems: List = ['4011002']
+    currentHour: int = 17
     # current_dayofweek: int
     # current_weather_category: str
     # current_holiday: str
-    top_n: int = 2
+    topN: int = 2
 
 class UserBase(BaseModel):
     username: str

@@ -124,3 +124,17 @@ class Aggregation:
         self.limit_same_category_occurrences()
         self.exclude_shorter_product_names()
         return self.reco_list
+    
+
+def enrich_with_upc(items: list[str], name_to_upc_map: dict) -> list[dict]:
+    return [
+        {
+            "name": item,
+            "upc": name_to_upc_map.get(item.lower(), "")
+        }
+        for item in items
+    ]
+
+
+def get_product_names_from_upcs(upcs: list[str], upc_to_name_map: dict) -> list[str]:
+    return [upc_to_name_map.get(upc.strip(), "") for upc in upcs if upc.strip() in upc_to_name_map]

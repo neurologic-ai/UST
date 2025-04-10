@@ -2,6 +2,7 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 
 from odmantic import AIOEngine
+from auth.api_key import get_api_key
 from models.schema import RecommendationRequestBody
 from models.hepler import categories_dct, Aggregation, enrich_with_upc, get_product_names_from_upcs
 from db.singleton import get_engine
@@ -15,8 +16,12 @@ import pandas as pd
 from models.db import BreakfastPopular, LunchPopular, DinnerPopular, OtherPopular, BreakfastAssociation, LunchAssociation, DinnerAssociation, OtherAssociation
 from initialize.helper import get_timing
 
-router = APIRouter()
-
+# router = APIRouter(tags=["Recommendation"])
+router = APIRouter(
+    prefix="/api/v1",  # version prefix
+    tags=["Recommendation V1"],
+    dependencies=[Depends(get_api_key)]
+)
 
 # @router.get("/view data")
 async def get_data(

@@ -6,7 +6,7 @@ from loguru import logger
 from fastapi.middleware.cors import CORSMiddleware
 import fastapi
 from configs.manager import settings
-from middleware.exception import ExceptionHandlerMiddleware
+from middleware.exception import APIKeyQueryMiddleware, ExceptionHandlerMiddleware
 from configs.events import startup_event, shutdown_event
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -25,6 +25,7 @@ def initialize_backend_application() -> fastapi.FastAPI:
         allow_headers=settings.ALLOWED_HEADERS,
     )
     app.add_middleware(ExceptionHandlerMiddleware)
+    app.add_middleware(APIKeyQueryMiddleware)
     app.include_router(recommendation_router)
     app.include_router(user_router)
     return app

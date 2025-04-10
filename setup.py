@@ -10,6 +10,8 @@ dinner_association_collection_name, other_association_collection_name
 
 import time
 
+from utils.helper import build_lookup_dicts, save_lookup_dicts
+
 
 def run_models_and_store_outputs():
     #Reading dataset
@@ -25,6 +27,9 @@ def run_models_and_store_outputs():
     #Pre-processing dataset
     preprocessor = DataPreprocessor(TIME_SLOTS)
     df = preprocessor.preprocess(df)
+
+    name_to_upc_map, upc_to_name_map = build_lookup_dicts(df)
+    save_lookup_dicts(name_to_upc_map, upc_to_name_map)
     for tm in TIMINGS:
         df_filtered = df[df[TIMINGS_COL] == tm].copy()
         # Apply Models

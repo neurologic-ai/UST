@@ -1,17 +1,22 @@
+from datetime import datetime
 import pandas as pd
 from collections import defaultdict
 from configs.constant import QUANTITY_COL, PRODUCT_NAME_COL, SESSION_COL
+from utils.helper import log_time
 
 
 def popular_based(df, top_n = 100):
+    start_time = datetime.now()
     # Group by product name and sum quantities, then get top_n popular products
     df_popular = df.groupby(PRODUCT_NAME_COL)[QUANTITY_COL].sum().nlargest(top_n)
 
     # Create a dictionary of popular products and their quantities
+    log_time("Popular product calculation", start_time)
     return [{'popular_data': df_popular.to_dict()}]
 
 
 def association_based(df: pd.DataFrame, top_n = 100) -> list:
+    start_time = datetime.now()
     association_cache = defaultdict(lambda: defaultdict(int))
 
     # Group by session and process associations
@@ -32,5 +37,6 @@ def association_based(df: pd.DataFrame, top_n = 100) -> list:
     }
 
     # Prepare output in the desired format
+    log_time("Association rule calculation", start_time)
     return [{'product': product, 'associate_products': associates} 
             for product, associates in sorted_association_cache.items()]

@@ -31,3 +31,10 @@ venev
 
 # macOS
 .DS_Store
+
+lookup_data
+db\categories
+initialize\Data\ABC Company_processed.csv
+C:\Users\iamsd\OneDrive\Desktop\Neurologic\UST\initialize\Data\XYZ Company_processed.csv
+initialize\Data\XYZ_Company_processed.csv
+

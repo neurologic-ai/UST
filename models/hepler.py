@@ -3,24 +3,51 @@ import pandas as pd
 from configs.constant import EXCLUDE_SUBCATEGORIES, STRICT_CATEGORY_RULES, MONO_CATEGORIES, CROSS_CATEGORIES, TIME_SLOTS, MAX_SUBCATEGORY_LIMIT, CATEGORY_DATA_PATH
 
 # Read Categories
-df_categories = pd.read_csv(CATEGORY_DATA_PATH)
+# df_categories = pd.read_csv(CATEGORY_DATA_PATH)
+
+# class Product:
+#     def __init__(self, name = None, category = None, subcategory = None, timing = None):
+#         self.name = name
+#         self.category = category
+#         self.subcategory = subcategory
+#         self.timing = timing
+
+# categories_dct = defaultdict(Product)
+
+# for idx, row in df_categories.iterrows():
+#     p_n = str(row['Product_name']).strip().lower()
+#     cat = str(row['Category']).strip().lower()
+#     scat = str(row['Subcategory']).strip().lower()
+#     tim = str(row['Timing']).strip().lower()
+
+#     categories_dct[p_n] = Product(p_n, cat, scat, tim)
 
 class Product:
-    def __init__(self, name = None, category = None, subcategory = None, timing = None):
+    def __init__(self, name=None, category=None, subcategory=None, timing=None, category_path=None):
         self.name = name
         self.category = category
         self.subcategory = subcategory
         self.timing = timing
+        self.category_path = category_path  # Accept category_path as an argument
 
-categories_dct = defaultdict(Product)
+    def load_category_data(self):
+        """Load category data from the given category path."""
+        if not self.category_path:
+            raise ValueError("No category path provided.")
 
-for idx, row in df_categories.iterrows():
-    p_n = str(row['Product_name']).strip().lower()
-    cat = str(row['Category']).strip().lower()
-    scat = str(row['Subcategory']).strip().lower()
-    tim = str(row['Timing']).strip().lower()
+        # Read the CSV for the provided category path
+        df_categories = pd.read_csv(self.category_path)
 
-    categories_dct[p_n] = Product(p_n, cat, scat, tim)
+        categories_dct = defaultdict(Product)
+        for idx, row in df_categories.iterrows():
+            p_n = str(row['Product_name']).strip().lower()
+            cat = str(row['Category']).strip().lower()
+            scat = str(row['Subcategory']).strip().lower()
+            tim = str(row['Timing']).strip().lower()
+
+            categories_dct[p_n] = Product(p_n, cat, scat, tim, self.category_path)
+        return categories_dct
+
 
 class Aggregation:
     def __init__(self, reco_list, cart_items, categories, current_hour,

@@ -11,6 +11,7 @@ class RecommendationRequestBody(BaseModel):
     # current_weather_category: str
     # current_holiday: str
     topN: int = 2
+    tenant: str
 
 class UserBase(BaseModel):
     username: str

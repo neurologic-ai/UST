@@ -37,4 +37,4 @@ def shutdown_event():
             logger.info("Database connection closed successfully")
         except Exception as e:
             logger.error(f"Error in closing database connection: {e}")
-        return shutdown_db_client
+    return shutdown_db_client

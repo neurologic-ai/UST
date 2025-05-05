@@ -9,19 +9,32 @@ os.makedirs(LOOKUP_DIR, exist_ok=True)
 
 # Define async functions for each recommendation source
 
-async def get_association_recommendations(engine: AIOEngine, cart_items: list, top_n: int, collection_name):
+# async def get_association_recommendations(engine: AIOEngine, cart_items: list, top_n: int, collection_name):
+#     assoc_products = {}
+#     if cart_items:
+#         for product in cart_items:
+#             assoc_recommendation = await engine.find_one(collection_name, {"product": product})
+#             if assoc_recommendation:
+#                 assoc_products.update(assoc_recommendation.associate_products)
+#     return list(assoc_products.keys())[:top_n]
+async def get_association_recommendations(engine: AIOEngine, cart_items: list, top_n: int, model, filters: dict):
     assoc_products = {}
     if cart_items:
         for product in cart_items:
-            assoc_recommendation = await engine.find_one(collection_name, {"product": product})
-            if assoc_recommendation:
-                assoc_products.update(assoc_recommendation.associate_products)
+            filters_with_product = filters.copy()
+            filters_with_product['product'] = product
+            doc = await engine.find_one(model, filters_with_product)
+            if doc:
+                assoc_products.update(doc.associate_products)
     return list(assoc_products.keys())[:top_n]
 
 
-async def get_popular_recommendation(engine: AIOEngine, top_n: int, collection_name):
-    popular_recommendation = await engine.find_one(collection_name)
-    return list(popular_recommendation.popular_data.keys())[:top_n] if popular_recommendation else []
+# async def get_popular_recommendation(engine: AIOEngine, top_n: int, collection_name):
+#     popular_recommendation = await engine.find_one(collection_name)
+#     return list(popular_recommendation.popular_data.keys())[:top_n] if popular_recommendation else []
+async def get_popular_recommendation(engine: AIOEngine, top_n: int, model, filters: dict):
+    doc = await engine.find_one(model, filters)
+    return list(doc.popular_data.keys())[:top_n] if doc else []
 
 
 def build_lookup_dicts(df: pd.DataFrame) -> tuple[dict, dict]:

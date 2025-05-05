@@ -89,27 +89,49 @@ async def recommendation(
     ######################################
     timing_category = get_timing(current_hr, TIME_SLOTS)
     # Gather all recommendations concurrently
-    if timing_category == 'Breakfast':
-        popular_recommendations, assoc_recommendations  = await asyncio.gather(
-            get_popular_recommendation(db, top_n, BreakfastPopular),
-            get_association_recommendations(db, cart_items, top_n, BreakfastAssociation)
-        )
-    elif timing_category == 'Lunch':
-        popular_recommendations, assoc_recommendations  = await asyncio.gather(
-            get_popular_recommendation(db, top_n, LunchPopular),
-            get_association_recommendations(db, cart_items, top_n, LunchAssociation)
-        )
-    elif timing_category == 'Dinner':
-        popular_recommendations, assoc_recommendations  = await asyncio.gather(
-            get_popular_recommendation(db, top_n, DinnerPopular),
-            get_association_recommendations(db, cart_items, top_n, DinnerAssociation)
-        )
-    elif timing_category == 'Other':
-        popular_recommendations, assoc_recommendations  = await asyncio.gather(
-            get_popular_recommendation(db, top_n, OtherPopular),
-            get_association_recommendations(db, cart_items, top_n, OtherAssociation)
-        )
+    # if timing_category == 'Breakfast':
+    #     popular_recommendations, assoc_recommendations  = await asyncio.gather(
+    #         get_popular_recommendation(db, top_n, BreakfastPopular),
+    #         get_association_recommendations(db, cart_items, top_n, BreakfastAssociation)
+    #     )
+    # elif timing_category == 'Lunch':
+    #     popular_recommendations, assoc_recommendations  = await asyncio.gather(
+    #         get_popular_recommendation(db, top_n, LunchPopular),
+    #         get_association_recommendations(db, cart_items, top_n, LunchAssociation)
+    #     )
+    # elif timing_category == 'Dinner':
+    #     popular_recommendations, assoc_recommendations  = await asyncio.gather(
+    #         get_popular_recommendation(db, top_n, DinnerPopular),
+    #         get_association_recommendations(db, cart_items, top_n, DinnerAssociation)
+    #     )
+    # elif timing_category == 'Other':
+    #     popular_recommendations, assoc_recommendations  = await asyncio.gather(
+    #         get_popular_recommendation(db, top_n, OtherPopular),
+    #         get_association_recommendations(db, cart_items, top_n, OtherAssociation)
+    #     )
+    filters = {
+        "store_id": data.storeId,
+        "location_id": data.locationId,
+        # "timing": timing_category
+    }
+    popular_model_map = {
+        'Breakfast': BreakfastPopular,
+        'Lunch': LunchPopular,
+        'Dinner': DinnerPopular,
+        'Other': OtherPopular
+    }
 
+    assoc_model_map = {
+        'Breakfast': BreakfastAssociation,
+        'Lunch': LunchAssociation,
+        'Dinner': DinnerAssociation,
+        'Other': OtherAssociation
+    }
+
+    popular_recommendations, assoc_recommendations = await asyncio.gather(
+        get_popular_recommendation(db, top_n, popular_model_map[timing_category], filters),
+        get_association_recommendations(db, cart_items, top_n, assoc_model_map[timing_category], filters)
+    )
     aggregator = Aggregation(popular_recommendations, cart_items, categories_dct, current_hr)
     filtered_popular_recommendation = aggregator.get_final_recommendations()
 

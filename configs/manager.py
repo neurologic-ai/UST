@@ -7,7 +7,7 @@ class BackendBaseSettings(BaseSettings):
     MONGO_URI: str = decouple.config("MONGO_URI")
     DB_NAME: str = decouple.config("DB_NAME") 
     CATEGORY_DATA_LOCATION: str = decouple.config("CATEGORY_DATA_LOCATION") 
-    api_key: str 
+    api_key: str = decouple.config("API_KEY")
     bucket_name: str = decouple.config("BUCKET_NAME")
     aws_access_key_id: str = decouple.config("AWS_ACCESS_KEY_ID")
     aws_secret_access_key: str = decouple.config("AWS_SECRET_ACCESS_KEY")

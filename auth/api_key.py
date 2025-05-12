@@ -2,8 +2,9 @@ import os
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security.api_key import APIKeyQuery, APIKey
 from fastapi.routing import APIRouter
+from configs.manager import settings
 
-API_KEY = os.getenv("API_KEY")
+API_KEY = settings.api_key
 API_KEY_NAME = "api_key"
 
 # Define the query-based security

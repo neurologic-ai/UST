@@ -10,15 +10,23 @@ dinner_association_collection_name, other_association_collection_name
 
 import time
 
+from utils.file_download import download_file_from_s3
 from utils.helper import build_lookup_dicts, save_lookup_dicts
 
 
 def run_models_and_store_outputs():
+    # Download file from S3 and get a file-like object
+    s3_url = ""
+    processed_file_buffer = download_file_from_s3(s3_url)
+
+    if processed_file_buffer is None:
+        print("Failed to download file from S3.")
+        return
     #Reading dataset
     try:
-        df = pd.read_csv(PROCESSED_DATA_PATH)
+        df = pd.read_csv(processed_file_buffer)
     except FileNotFoundError:
-        print(f"Error: File not found at {PROCESSED_DATA_PATH}. Please check the file path.")
+        print(f"Error: File not found at {processed_file_buffer}. Please check the file path.")
         return
     except Exception as e:
         print(f"Error reading the dataset: {str(e)}")

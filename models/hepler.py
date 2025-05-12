@@ -3,14 +3,14 @@ import pandas as pd
 from configs.constant import EXCLUDE_SUBCATEGORIES, STRICT_CATEGORY_RULES, MONO_CATEGORIES, CROSS_CATEGORIES, TIME_SLOTS, MAX_SUBCATEGORY_LIMIT, CATEGORY_DATA_PATH
 from utils.file_download import download_file_from_s3
 
-# Use S3 download and read as DataFrame
-url = ""
-file_buffer = download_file_from_s3(url)
-if file_buffer is None:
-    raise Exception("Failed to load CATEGORY_DATA_PATH from S3.")
-df_categories = pd.read_csv(file_buffer)
-# # Read Categories
-# df_categories = pd.read_csv(CATEGORY_DATA_PATH)
+# # Use S3 download and read as DataFrame
+# url = ""
+# file_buffer = download_file_from_s3(url)
+# if file_buffer is None:
+#     raise Exception("Failed to load CATEGORY_DATA_PATH from S3.")
+# df_categories = pd.read_csv(file_buffer)
+# Read Categories
+df_categories = pd.read_csv(CATEGORY_DATA_PATH)
 
 class Product:
     def __init__(self, name = None, category = None, subcategory = None, timing = None):

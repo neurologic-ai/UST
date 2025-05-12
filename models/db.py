@@ -12,6 +12,8 @@ class User(Model):
 
 
 class BreakfastPopular(Model):
+    location_id: int
+    store_id: int
     popular_data: Dict[str, int]
 
     model_config = {
@@ -19,6 +21,8 @@ class BreakfastPopular(Model):
     }
 
 class LunchPopular(Model):
+    location_id: int
+    store_id: int
     popular_data: Dict[str, int]
 
     model_config = {
@@ -26,6 +30,8 @@ class LunchPopular(Model):
     }
 
 class DinnerPopular(Model):
+    location_id: int
+    store_id: int
     popular_data: Dict[str, int]
 
     model_config = {
@@ -33,6 +39,8 @@ class DinnerPopular(Model):
     }
 
 class OtherPopular(Model):
+    location_id: int
+    store_id: int
     popular_data: Dict[str, int]
 
     model_config = {
@@ -40,6 +48,8 @@ class OtherPopular(Model):
     }
     
 class BreakfastAssociation(Model):
+    location_id: int
+    store_id: int
     product: str
     associate_products: Dict[str, int]
 
@@ -48,6 +58,8 @@ class BreakfastAssociation(Model):
     }
 
 class LunchAssociation(Model):
+    location_id: int
+    store_id: int
     product: str
     associate_products: Dict[str, int]
 
@@ -56,6 +68,8 @@ class LunchAssociation(Model):
     }
 
 class DinnerAssociation(Model):
+    location_id: int
+    store_id: int
     product: str
     associate_products: Dict[str, int]
 
@@ -64,6 +78,8 @@ class DinnerAssociation(Model):
     }
 
 class OtherAssociation(Model):
+    location_id: int
+    store_id: int
     product: str
     associate_products: Dict[str, int]
 

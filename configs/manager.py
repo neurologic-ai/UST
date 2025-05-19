@@ -12,7 +12,7 @@ class BackendBaseSettings(BaseSettings):
     IS_ALLOWED_CREDENTIALS: bool = True
     # get the list of allowed origins from the environment variable
     
-    ALLOWED_ORIGINS: list[str]= ["http://localhost:3000"]
+    ALLOWED_ORIGINS: list[str]= ["http://localhost:3000","https://visioncheckout.fc-ust.com","http://visioncheckout.edge","http://localhost:4000"]
     ALLOWED_METHODS: list[str] = ["*"]
     ALLOWED_HEADERS: list[str] = ["*"]
     

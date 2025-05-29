@@ -18,6 +18,7 @@ DATE_COL = 'Datetime'
 PRODUCT_NAME_COL = 'Product_name'
 QUANTITY_COL = 'Quantity'
 TIMINGS_COL = 'Timing'
+UPC_COL = 'UPC'
 
 EXPECTED_CATEGORY_COLS = {
     'Product_name': 'object',

@@ -66,6 +66,29 @@ class ProductOutput(BaseModel):
     subcategory: Optional[str]
     timing: Timing
 
+def safe_parse_json(text: str):
+    """
+    Attempts to safely parse a potentially malformed JSON string.
+    Falls back to extracting multiple JSON objects from the text.
+    """
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("Malformed JSON detected, attempting fallback parsing.")
+        # Extract individual JSON objects from the text
+        objects = re.findall(r'\{.*?\}', text, flags=re.DOTALL)
+        parsed_objects = []
+        for obj in objects:
+            try:
+                parsed_objects.append(json.loads(obj))
+            except json.JSONDecodeError:
+                logger.warning(f"Skipping malformed object: {obj}")
+                continue
+        if not parsed_objects:
+            raise ValueError("No valid JSON objects could be parsed from response.")
+        return parsed_objects
+
+
 # === Classification Service ===
 class ClassificationService:
     def __init__(self, api_key: str, redis_client: redis.Redis, model: str = 'gpt-4o', batch_size: int = 500):
@@ -93,7 +116,7 @@ class ClassificationService:
             ']'
         )
 
-
+    
     def _classify_batch(self, products: List[str]) -> List[ProductOutput]:
         prompt = self._build_prompt(products)
         try:
@@ -116,17 +139,14 @@ class ClassificationService:
 
             # Try parsing directly
             try:
-                return json.loads(text)
+                data = json.loads(text)
             except json.JSONDecodeError:
-                logger.warning("Malformed JSON detected, attempting to auto-correct...")
+                data = safe_parse_json(text)
 
-                # Fix incomplete JSON by trimming to last full object
-                fixed_text = re.sub(r',?\s*\{\s*"product"\s*:\s*".*$', '', text.strip(), flags=re.DOTALL)
-                fixed_text = fixed_text.strip().rstrip(',')  # remove trailing comma
-                fixed_text = f"[{fixed_text}]" if not fixed_text.startswith("[") else f"{fixed_text}]"
+            if not isinstance(data, list):
+                raise ValueError("Expected a list of JSON objects.")
 
-                logger.debug(f"Fixed JSON: {fixed_text}")
-                return json.loads(fixed_text)
+            return [ProductOutput(**item) for item in data]
 
         except Exception as e:
             logger.exception(f"LLM classification error: {e}")

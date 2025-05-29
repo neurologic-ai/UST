@@ -9,6 +9,7 @@ from configs.manager import settings
 from middleware.exception import ExceptionHandlerMiddleware
 from configs.events import startup_event, shutdown_event
 from fastapi.middleware.gzip import GZipMiddleware
+from routes.tenant_route import router as tenant_router
 
 
 def initialize_backend_application() -> fastapi.FastAPI:
@@ -27,6 +28,7 @@ def initialize_backend_application() -> fastapi.FastAPI:
     app.add_middleware(ExceptionHandlerMiddleware)
     app.include_router(recommendation_router)
     app.include_router(user_router)
+    app.include_router(tenant_router)
     return app
 
 

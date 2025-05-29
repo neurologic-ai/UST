@@ -1,26 +1,40 @@
 from collections import defaultdict
+from dataclasses import asdict, dataclass
 import pandas as pd
 from configs.constant import EXCLUDE_SUBCATEGORIES, STRICT_CATEGORY_RULES, MONO_CATEGORIES, CROSS_CATEGORIES, TIME_SLOTS, MAX_SUBCATEGORY_LIMIT, CATEGORY_DATA_PATH
+from utils.file_download import download_file_from_s3
 
+# # Use S3 download and read as DataFrame
+# url = ""
+# file_buffer = download_file_from_s3(url)
+# if file_buffer is None:
+#     raise Exception("Failed to load CATEGORY_DATA_PATH from S3.")
+# df_categories = pd.read_csv(file_buffer)
 # Read Categories
-df_categories = pd.read_csv(CATEGORY_DATA_PATH)
+# df_categories = pd.read_csv(CATEGORY_DATA_PATH)
 
+@dataclass
 class Product:
     def __init__(self, name = None, category = None, subcategory = None, timing = None):
         self.name = name
         self.category = category
         self.subcategory = subcategory
         self.timing = timing
+    def to_dict(self):
+        return asdict(self)
 
-categories_dct = defaultdict(Product)
+    @staticmethod
+    def from_dict(data):
+        return Product(**data)
+# categories_dct = defaultdict(Product)
 
-for idx, row in df_categories.iterrows():
-    p_n = str(row['Product_name']).strip().lower()
-    cat = str(row['Category']).strip().lower()
-    scat = str(row['Subcategory']).strip().lower()
-    tim = str(row['Timing']).strip().lower()
+# for idx, row in df_categories.iterrows():
+#     p_n = str(row['Product_name']).strip().lower()
+#     cat = str(row['Category']).strip().lower()
+#     scat = str(row['Subcategory']).strip().lower()
+#     tim = str(row['Timing']).strip().lower()
 
-    categories_dct[p_n] = Product(p_n, cat, scat, tim)
+#     categories_dct[p_n] = Product(p_n, cat, scat, tim)
 
 class Aggregation:
     def __init__(self, reco_list, cart_items, categories, current_hour,
@@ -126,15 +140,15 @@ class Aggregation:
         return self.reco_list
     
 
-def enrich_with_upc(items: list[str], name_to_upc_map: dict) -> list[dict]:
-    return [
-        {
-            "name": item,
-            "upc": name_to_upc_map.get(item.lower(), "")
-        }
-        for item in items
-    ]
+# def enrich_with_upc(items: list[str], name_to_upc_map: dict) -> list[dict]:
+#     return [
+#         {
+#             "name": item,
+#             "upc": name_to_upc_map.get(item.lower(), "")
+#         }
+#         for item in items
+#     ]
 
 
-def get_product_names_from_upcs(upcs: list[str], upc_to_name_map: dict) -> list[str]:
-    return [upc_to_name_map.get(upc.strip(), "") for upc in upcs if upc.strip() in upc_to_name_map]
+# def get_product_names_from_upcs(upcs: list[str], upc_to_name_map: dict) -> list[str]:
+#     return [upc_to_name_map.get(upc.strip(), "") for upc in upcs if upc.strip() in upc_to_name_map]

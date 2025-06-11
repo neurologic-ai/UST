@@ -31,3 +31,9 @@ venev
 
 # macOS
 .DS_Store
+
+lambda_package
+
+downloads
+test.py
+weather/weather.json

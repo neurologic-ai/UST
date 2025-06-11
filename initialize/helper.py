@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
 from configs.constant import DATE_COL, PRODUCT_NAME_COL, TIMINGS_COL, TIMINGS
 from typing import Union, Dict, Tuple
+from db.singleton import lookup_collection
 
 
 def get_timing(hr, timing_ranges):
@@ -12,6 +14,29 @@ def get_timing(hr, timing_ranges):
                             return category
     except:
         return "None"
+
+
+def vectorized_apply_timing_classification(df: pd.DataFrame, datetime_col: str, output_col: str, timing_ranges: Dict[str, Tuple[int, int]]) -> pd.DataFrame:
+    df[datetime_col] = pd.to_datetime(df[datetime_col], errors='coerce')
+    df['hour'] = df[datetime_col].dt.hour
+
+    def get_category_series(hours: pd.Series) -> pd.Series:
+        result = pd.Series(["None"] * len(hours), index=hours.index)
+
+        for category, (start, end) in timing_ranges.items():
+            if category not in TIMINGS:
+                continue
+            if start <= end:
+                mask = (hours >= start) & (hours < end)
+            else:  # spans midnight
+                mask = (hours >= start) | (hours < end)
+            result[mask] = category
+        return result
+
+    df[output_col] = get_category_series(df['hour'])
+    df.drop(columns=['hour'], inplace=True)
+    return df
+
 
 class TimingClassifier:
     def __init__(self, timing_ranges: Dict[str, Tuple[int, int]]):
@@ -38,16 +63,16 @@ class TimingClassifier:
         except Exception:
             return "None"
 
-    def apply_timing_classification(self, df: pd.DataFrame, datetime_col: str, output_col: str) -> pd.DataFrame:
-        """
-        Apply timing classification to a DataFrame.
-        :param df: Input DataFrame.
-        :param datetime_col: Column name in DataFrame containing datetime strings.
-        :param output_col: Column name where the classified timings will be stored.
-        :return: Updated DataFrame with the timing classification.
-        """
-        df[output_col] = df[datetime_col].apply(self.classify_timing)
-        return df
+    # def apply_timing_classification(self, df: pd.DataFrame, datetime_col: str, output_col: str) -> pd.DataFrame:
+    #     """
+    #     Apply timing classification to a DataFrame.
+    #     :param df: Input DataFrame.
+    #     :param datetime_col: Column name in DataFrame containing datetime strings.
+    #     :param output_col: Column name where the classified timings will be stored.
+    #     :return: Updated DataFrame with the timing classification.
+    #     """
+    #     df[output_col] = df[datetime_col].apply(self.classify_timing)
+    #     return df
 
     
 
@@ -70,15 +95,73 @@ class DataPreprocessor:
             df_inp[PRODUCT_NAME_COL] = df_inp[PRODUCT_NAME_COL].apply(lambda x: x.strip().lower() if isinstance(x, str) else x)
 
         # Apply timing classification
-        df_out = self.timing_classifier.apply_timing_classification(df_inp, datetime_col = DATE_COL, output_col = TIMINGS_COL)
+        # df_out = self.timing_classifier.apply_timing_classification(df_inp, datetime_col = DATE_COL, output_col = TIMINGS_COL)
+        df_out = vectorized_apply_timing_classification(
+            df_inp,
+            datetime_col=DATE_COL,
+            output_col=TIMINGS_COL,
+            timing_ranges=self.timing_classifier.timing_ranges
+        )
         return df_out
     
 
 
-def insert_data(collection_name, inp_data, many = True, dataset_name = ''):
-    collection_name.delete_many({})
+# def insert_data(collection_name, inp_data, many = True, dataset_name = ''):
+#     collection_name.delete_many({})
+#     if many:
+#         collection_name.insert_many(inp_data)
+#     else:
+#         collection_name.insert_one(inp_data)
+#     print(f"{dataset_name} data stored successfully!")
+
+import numpy as np
+
+def convert_numpy_to_native(obj):
+    """Recursively convert numpy types to native Python types."""
+    if isinstance(obj, dict):
+        return {k: convert_numpy_to_native(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_to_native(i) for i in obj]
+    elif isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64)):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    else:
+        return obj
+
+def insert_data(collection_name, inp_data, many=True, dataset_name=''):
+    # Convert numpy types to native Python types
+    if many:
+        inp_data = [convert_numpy_to_native(doc) for doc in inp_data]
+    else:
+        inp_data = convert_numpy_to_native(inp_data)
+
+    # Clear existing data for the combination of store_id, location_id, and timing
+    filter_query = {
+        "location_id": inp_data[0].get("location_id") if many else inp_data.get("location_id"),
+        "store_id": inp_data[0].get("store_id") if many else inp_data.get("store_id")
+    }
+    collection_name.delete_many(filter_query)
+
+    # Insert new data
     if many:
         collection_name.insert_many(inp_data)
     else:
         collection_name.insert_one(inp_data)
+
     print(f"{dataset_name} data stored successfully!")
+
+
+
+async def load_lookup_dicts(tenant_id, location_id):
+    doc = await lookup_collection.find_one({
+        "tenant_id": tenant_id,
+        "location_id": location_id
+    })
+
+    if doc:
+        return doc.get("name_to_upc", {}), doc.get("upc_to_name", {})
+    else:
+        return {}, {}

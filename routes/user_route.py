@@ -70,7 +70,7 @@ def create_token(user: User) -> str:
     token = jwt.encode(payload, key='secret',algorithm='HS256')
     return token
 
-# @router.post('/token')
+@router.post('/login')
 async def login(
     login_data:  LoginData,
     db: AIOEngine = Depends(get_engine),
@@ -80,7 +80,7 @@ async def login(
     token = Token(access_token=token_str, token_type='bearer')
     return token
 
-# @router.post('/users/create')
+@router.post('/users/create')
 async def create_user(
     user: UserCreate,
     athorize:bool=Depends(PermissionChecker(['users:write'])),
@@ -92,6 +92,17 @@ async def create_user(
  
 
 
-# @router.get('/users/me')
+@router.get('/users/me')
 def get_user(current_user: PyUser = Depends(get_current_user)):
     return current_user
+
+from fastapi.security import OAuth2PasswordRequestForm
+
+@router.post('/token')
+async def token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AIOEngine = Depends(get_engine),
+) -> Token:
+    user = await authenticate_user(db, form_data.username, form_data.password)
+    token_str = create_token(user)
+    return Token(access_token=token_str, token_type='bearer')

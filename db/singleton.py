@@ -1,4 +1,3 @@
-
 from loguru import logger
 from configs.manager import settings
 from motor import motor_asyncio, core
@@ -47,6 +46,9 @@ breakfast_popular_collection_name = MongoDatabase()['breakfast_popular_collectio
 lunch_popular_collection_name = MongoDatabase()['lunch_popular_collection']
 dinner_popular_collection_name = MongoDatabase()['dinner_popular_collection']
 other_popular_collection_name = MongoDatabase()['other_popular_collection']
+
+lookup_collection = MongoDatabase()['lookup_dicts']
+
 
 __all__ = ["MongoDatabase", 
            "get_engine",

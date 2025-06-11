@@ -18,6 +18,7 @@ DATE_COL = 'Datetime'
 PRODUCT_NAME_COL = 'Product_name'
 QUANTITY_COL = 'Quantity'
 TIMINGS_COL = 'Timing'
+UPC_COL = 'UPC'
 
 EXPECTED_CATEGORY_COLS = {
     'Product_name': 'object',
@@ -76,3 +77,32 @@ TIME_SLOTS = {
 TIMINGS = ['Breakfast', 'Lunch', 'Dinner', 'Other']
 
 MAX_SUBCATEGORY_LIMIT = 1
+
+
+WEATHER_FILTERS = {
+    "hot": {
+        "prefer": [
+            "ice cream", "smoothie", "juice", "water", "soda", "cold drink", "iced tea", 
+            "iced coffee", "lemonade", "coconut water", "cold cuts", "fruit", "yogurt"
+        ],
+        "avoid": [
+            "soup", "hot chocolate", "coffee", "tea", "hot drink", "chili", "prepared meal", 
+            "main course", "hot meal", "spicy food", "porridge", "oatmeal"
+        ]
+    },
+    "cold": {
+        "prefer": [
+            "soup", "coffee", "tea", "hot chocolate", "hot drink", "chili", "prepared meal", 
+            "main course", "spicy food", "oatmeal", "porridge", "sandwich", "burger"
+        ],
+        "avoid": [
+            "ice cream", "smoothie", "juice", "cold drink", "iced tea", "iced coffee", 
+            "cold cuts", "coconut water"
+        ]
+    },
+    "moderate": {
+        "prefer": [],
+        "avoid": []
+    }
+}
+

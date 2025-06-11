@@ -7,7 +7,20 @@ class BackendBaseSettings(BaseSettings):
     MONGO_URI: str = decouple.config("MONGO_URI")
     DB_NAME: str = decouple.config("DB_NAME") 
     CATEGORY_DATA_LOCATION: str = decouple.config("CATEGORY_DATA_LOCATION") 
-    api_key: str 
+    api_key: str = decouple.config("API_KEY")
+    bucket_name: str = decouple.config("BUCKET_NAME")
+    aws_access_key_id: str = decouple.config("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: str = decouple.config("AWS_SECRET_ACCESS_KEY")
+    GEMINI_PROJECT: str = decouple.config("GEMINI_PROJECT")
+    GEMINI_LOCATION: str = decouple.config("GEMINI_LOCATION")
+    GEMINI_SERVICE_ACCOUNT_PATH: str = decouple.config("GEMINI_SERVICE_ACCOUNT_PATH")
+    GEMINI_API_SCOPE: str = decouple.config("GEMINI_API_SCOPE")
+    GEMINI_MODEL: str = decouple.config("GEMINI_MODEL")
+    WEATHER_URL: str = decouple.config("WEATHER_URL")
+    WEATHER_APIKEY: str = decouple.config("WEATHER_APIKEY")
+    REDIS_HOST: str = decouple.config("REDIS_HOST")
+    REDIS_PORT: int = decouple.config("REDIS_PORT")
+    
     
     IS_ALLOWED_CREDENTIALS: bool = True
     # get the list of allowed origins from the environment variable

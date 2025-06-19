@@ -198,7 +198,7 @@ class ClassificationService:
         prompt = self._build_prompt(products)
         print(f"Length of prompt: {len(prompt)} characters")
         try:
-            response = self.model.generate_content(prompt)
+            response = self.model.generate_content(prompt, generation_config={"temperature": 0})
             text = response.text.strip()
             if not text:
                 logger.error("Empty response from Gemini")

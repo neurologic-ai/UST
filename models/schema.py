@@ -101,6 +101,7 @@ class LocationModel(BaseModel):
 
 class TenantCreate(BaseModel):
     tenant_name: str
+    # status: str
     locations: List[LocationModel] = []
 
     class Config:
@@ -130,38 +131,5 @@ class TenantCreate(BaseModel):
 class TenantUpdate(BaseModel):
     tenant_id: str
     tenant_name: Optional[str] = None
-    locations: Optional[List[LocationModel]] = None
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "tenant_id": "682b5a70a9f70088c6d85448",
-                "tenant_name": "Dominos Updated",
-                "locations": [
-                    {
-                        "location_id": "location_1",
-                        "name": "Delhi HQ",
-                        "stores": [
-                            {
-                                "store_id": "store_1",
-                                "name": "Connaught Place Store"
-                            },
-                            {
-                                "store_id": "store_2",
-                                "name": "Saket Store"
-                            }
-                        ]
-                    },
-                    {
-                        "location_id": "location_2",
-                        "name": "Mumbai Branch",
-                        "stores": [
-                            {
-                                "store_id": "store_3",
-                                "name": "Bandra Store"
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
+    api_key: Optional[str] = None
+    status: str

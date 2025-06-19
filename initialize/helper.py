@@ -1,3 +1,4 @@
+import traceback
 import numpy as np
 import pandas as pd
 from configs.constant import DATE_COL, PRODUCT_NAME_COL, TIMINGS_COL, TIMINGS
@@ -131,27 +132,65 @@ def convert_numpy_to_native(obj):
     else:
         return obj
 
-def insert_data(collection_name, inp_data, many=True, dataset_name=''):
+# def insert_data(collection_name, inp_data, many=True, dataset_name=''):
+#     # Convert numpy types to native Python types
+#     if many:
+#         inp_data = [convert_numpy_to_native(doc) for doc in inp_data]
+#     else:
+#         inp_data = convert_numpy_to_native(inp_data)
+
+#     # Clear existing data for the combination of store_id, location_id, and timing
+#     filter_query = {
+#         "location_id": inp_data[0].get("location_id") if many else inp_data.get("location_id"),
+#         "store_id": inp_data[0].get("store_id") if many else inp_data.get("store_id")
+#     }
+#     collection_name.delete_many(filter_query)
+
+#     # Insert new data
+#     if many:
+#         collection_name.insert_many(inp_data)
+#     else:
+#         collection_name.insert_one(inp_data)
+
+#     print(f"{dataset_name} data stored successfully!")
+
+async def insert_data(collection_name, inp_data, many=True, dataset_name=''):
+    print("DEBUG: Type of collection_name:", type(collection_name))
     # Convert numpy types to native Python types
     if many:
         inp_data = [convert_numpy_to_native(doc) for doc in inp_data]
     else:
         inp_data = convert_numpy_to_native(inp_data)
 
-    # Clear existing data for the combination of store_id, location_id, and timing
+    # Clear existing data for the combination of store_id and location_id
     filter_query = {
         "location_id": inp_data[0].get("location_id") if many else inp_data.get("location_id"),
         "store_id": inp_data[0].get("store_id") if many else inp_data.get("store_id")
     }
-    collection_name.delete_many(filter_query)
 
-    # Insert new data
-    if many:
-        collection_name.insert_many(inp_data)
-    else:
-        collection_name.insert_one(inp_data)
+    print("Deleting existing data with filter:", filter_query)
 
-    print(f"{dataset_name} data stored successfully!")
+    try:
+        result = await collection_name.delete_many(filter_query)  # await here
+        print(f"Deleted {result.deleted_count} existing records")
+    except Exception as e:
+        print("Deletion failed:", e)
+
+    # print("Final data going to DB:", inp_data)
+
+    try:
+        if many:
+            result = await collection_name.insert_many(inp_data)  
+            print(result.acknowledged)
+            # print(f"Insertion successful, inserted IDs: {result.inserted_ids}")
+        else:
+            result = await collection_name.insert_one(inp_data)  
+            print(result.acknowledged)
+            # print(f"Insertion successful, inserted ID: {result.inserted_id}")
+        print(f"{dataset_name} data stored successfully!")
+    except Exception as e:
+        print("Insertion failed:", e)
+        traceback.print_exc()
 
 
 

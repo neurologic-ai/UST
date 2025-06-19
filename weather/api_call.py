@@ -26,6 +26,7 @@ def get_weather_forecast(lat, lon):
 # --- Classify and cache only the "feels like" map ---
 def get_or_set_feels_like_map(lat, lon, redis_client: redis.Redis):
     redis_key = f"Weather:{lat}:{lon}"
+    logger.debug(redis_key)
     cached = redis_client.get(redis_key)
 
     if cached:
@@ -67,7 +68,7 @@ def get_weather_feel(lat, lon, dt: datetime, redis_client: redis.Redis):
     feels_like_map = get_or_set_feels_like_map(lat, lon, redis_client)
     # logger.debug(feels_like_map)
     if not feels_like_map:
-        return None
+        return "moderate"
 
-    return feels_like_map.get(timestamp_key, None)
+    return feels_like_map.get(timestamp_key, "moderate")
 

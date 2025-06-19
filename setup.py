@@ -49,7 +49,7 @@ def save_lookup_dicts(tenant_id, location_id, name_to_upc, upc_to_name):
 
 
 
-def run_models_and_store_outputs(s3_url, tenant_id, location_id):
+async def run_models_and_store_outputs(s3_url, tenant_id, location_id):
     # Download file from S3 and get a file-like object
     processed_file_buffer = download_file_from_s3(s3_url)
 
@@ -89,9 +89,9 @@ def run_models_and_store_outputs(s3_url, tenant_id, location_id):
         if tm == 'Breakfast':
             try:
                 print("Preparing breakfast recommendation dataset...")
-                insert_data(breakfast_popular_collection_name, popular_json, dataset_name = 'breakfast_popular')
+                await insert_data(breakfast_popular_collection_name, popular_json, dataset_name = 'breakfast_popular')
                 time.sleep(1)
-                insert_data(breakfast_association_collection_name, association_json, dataset_name = 'breakfast_association')
+                await insert_data(breakfast_association_collection_name, association_json, dataset_name = 'breakfast_association')
                 time.sleep(1)
             except Exception as e:
                 print(f"Error in preparing or inserting breakfast recommendation data: {str(e)}")
@@ -101,9 +101,9 @@ def run_models_and_store_outputs(s3_url, tenant_id, location_id):
         elif tm == 'Lunch':
             try:
                 print("Preparing lunch recommendation dataset...")
-                insert_data(lunch_popular_collection_name, popular_json, dataset_name = 'lunch_popular')
+                await insert_data(lunch_popular_collection_name, popular_json, dataset_name = 'lunch_popular')
                 time.sleep(1)
-                insert_data(lunch_association_collection_name, association_json, dataset_name = 'lunch_association')
+                await insert_data(lunch_association_collection_name, association_json, dataset_name = 'lunch_association')
                 time.sleep(1)
             except Exception as e:
                 print(f"Error in preparing or inserting lunch recommendation data: {str(e)}")
@@ -113,9 +113,9 @@ def run_models_and_store_outputs(s3_url, tenant_id, location_id):
         elif tm == 'Dinner':
             try:
                 print("Preparing dinner recommendation dataset...")
-                insert_data(dinner_popular_collection_name, popular_json, dataset_name = 'dinner_popular')
+                await insert_data(dinner_popular_collection_name, popular_json, dataset_name = 'dinner_popular')
                 time.sleep(1)
-                insert_data(dinner_association_collection_name, association_json, dataset_name = 'dinner_association')
+                await insert_data(dinner_association_collection_name, association_json, dataset_name = 'dinner_association')
                 time.sleep(1)
             except Exception as e:
                 print(f"Error in preparing or inserting dinner recommendation data: {str(e)}")
@@ -125,9 +125,9 @@ def run_models_and_store_outputs(s3_url, tenant_id, location_id):
         elif tm == 'Other':
             try:
                 print("Preparing other recommendation dataset...")
-                insert_data(other_popular_collection_name, popular_json, dataset_name = 'other_popular')
+                await insert_data(other_popular_collection_name, popular_json, dataset_name = 'other_popular')
                 time.sleep(1)
-                insert_data(other_association_collection_name, association_json, dataset_name = 'other_association')
+                await insert_data(other_association_collection_name, association_json, dataset_name = 'other_association')
                 time.sleep(1)
             except Exception as e:
                 print(f"Error in preparing or inserting other recommendation data: {str(e)}")

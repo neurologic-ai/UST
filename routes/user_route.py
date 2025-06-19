@@ -60,7 +60,7 @@ class PermissionChecker:
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail='Permissions'
                 )
-        return True
+        return user
 
 
 def create_token(user: User) -> str:

@@ -1,3 +1,4 @@
+import traceback
 import boto3
 from botocore.exceptions import NoCredentialsError
 from datetime import datetime
@@ -27,7 +28,7 @@ def upload_file_to_s3(file, csv_type, tenant_id, location_id):
         region_name='us-east-2'
     )
 
-    current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # dest_name = f"{tenant_id}/{location_id}/{current_datetime}/{csv_type}.csv"
     dest_name = f"{tenant_id}/{location_id}/{csv_type}.csv"
 
@@ -36,19 +37,14 @@ def upload_file_to_s3(file, csv_type, tenant_id, location_id):
         # s3_client.upload_fileobj(file, settings.bucket_name, 'lambda_new.zip')
         file_url = f"https://{settings.bucket_name}.s3.amazonaws.com/{dest_name}"
         return file_url
-        # presigned_url = s3_client.generate_presigned_url(
-        #     'get_object',
-        #     Params={'Bucket': settings.bucket_name, 'Key': dest_name},
-        #     ExpiresIn=3600
-        # )
 
-        # return presigned_url
 
     except NoCredentialsError:
         print("Credentials not available.")
         return None
     except Exception as e:
         print(f"Error uploading file: {e}")
+        logger.debug(traceback.format_exc())
         return None
 
 

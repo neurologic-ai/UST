@@ -6,11 +6,11 @@ from utils.make_category_csv import ClassificationService
 from configs.manager import settings
 
 GEMINI_PROJECT = settings.GEMINI_PROJECT
-logger.debug(GEMINI_PROJECT)
+# logger.debug(GEMINI_PROJECT)
 GEMINI_LOCATION = settings.GEMINI_LOCATION
-logger.debug(GEMINI_LOCATION)
+# logger.debug(GEMINI_LOCATION)
 GEMINI_SERVICE_ACCOUNT_PATH = settings.GEMINI_SERVICE_ACCOUNT_PATH
-logger.debug(GEMINI_SERVICE_ACCOUNT_PATH)
+# logger.debug(GEMINI_SERVICE_ACCOUNT_PATH)
 
 # def generate_category_df_from_processed(processed_df: pd.DataFrame, redis_client: redis.Redis,) -> pd.DataFrame:
 #     # processed_df['Product_name_clean'] = processed_df['Product_name'].str.strip().str.lower()
@@ -37,7 +37,7 @@ logger.debug(GEMINI_SERVICE_ACCOUNT_PATH)
 #     return pd.DataFrame(category_rows)
 
 
-def generate_category_df_from_processed(processed_df: pd.DataFrame, redis_client: redis.Redis,) -> pd.DataFrame:
+async def generate_category_df_from_processed(processed_df: pd.DataFrame, redis_client: redis.Redis,) -> pd.DataFrame:
 # def generate_category_df_from_processed(processed_df: pd.DataFrame) -> pd.DataFrame:
     # Normalize product names: strip, lower, remove special spaces, etc.
     def normalize_key(name: str) -> str:

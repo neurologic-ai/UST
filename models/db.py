@@ -1,5 +1,6 @@
+from datetime import datetime
 from odmantic import EmbeddedModel, Model
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -14,12 +15,10 @@ class User(Model):
 
 class PopularProductData(BaseModel):
     upc: str
-    # upc: int
     count: int
 
 class AssociationProductData(BaseModel):
     upc: str
-    # upc: int
     count: int
 
 # --- Popular Models ---
@@ -207,8 +206,14 @@ class Location(EmbeddedModel):
 
 class Tenant(Model):
     tenant_name: str
+    normalized_name: str
     api_key: str
     locations: List[Location] = []
+    created_at: datetime
+    created_by: str
+    updated_at: Optional[datetime]
+    updated_by: Optional[str]
+    is_active: bool
 
     model_config = {
         "collection": "tenant_collection"

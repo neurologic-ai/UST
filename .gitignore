@@ -37,3 +37,5 @@ lambda_package
 downloads
 test.py
 weather/weather.json
+user.json
+lambda_package.zip

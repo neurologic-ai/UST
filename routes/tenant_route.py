@@ -1,5 +1,7 @@
+from datetime import datetime
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
+from loguru import logger
 from odmantic import AIOEngine
 from bson import ObjectId
 
@@ -23,7 +25,8 @@ async def create_tenant(
     authorize:bool=Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
     ):
-    existing = await db.find_one(Tenant, Tenant.tenant_name == data.tenant_name)
+    normalized_name = data.tenant_name.strip().lower()
+    existing = await db.find_one(Tenant, Tenant.normalized_name == normalized_name)
     if existing:
         raise HTTPException(status_code=400, detail="Tenant with this name already exists")
     
@@ -31,6 +34,7 @@ async def create_tenant(
 
     tenant = Tenant(
         tenant_name=data.tenant_name,
+        normalized_name=normalized_name,
         api_key=api_key,
         locations=[
             Location(
@@ -39,7 +43,12 @@ async def create_tenant(
                 stores=[Store(**store.dict()) for store in loc.stores]
             )
             for loc in data.locations
-        ]
+        ],
+        created_at= datetime.utcnow(),
+        created_by=str(authorize.id),
+        updated_at=None,
+        updated_by=None,
+        is_active=True
     )
 
     await db.save(tenant)
@@ -50,7 +59,7 @@ async def create_tenant(
         "api_key": api_key
     }
 
-@router.put("/tenant")
+@router.put("/tenant/update")
 async def update_tenant(
     data: TenantUpdate,
     authorize:bool=Depends(PermissionChecker(['items:write'])),

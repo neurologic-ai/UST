@@ -201,11 +201,6 @@ from typing import Dict
 from models.db import CategoryCache, CategoryData  # Adjust as needed
 
 async def get_categories_from_cache_or_s3(tenant_id: str, location_id: str, s3_url: str, db) -> Dict[str, "Product"]:
-    # 1. Try MongoDB
-    # cache_doc = CategoryCache.find_one({
-    #     "tenant_id": tenant_id,
-    #     "location_id": location_id
-    # })
     cache_key = {"tenant_id": tenant_id, "location_id": location_id}
     cache_doc = await db.find_one(CategoryCache, cache_key)
     if cache_doc:

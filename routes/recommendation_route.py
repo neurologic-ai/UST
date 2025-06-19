@@ -56,26 +56,31 @@ async def upload_csvs(
 ):
     try:
         # Step 1: Read both files into pandas DataFrames
-        df_processed = pd.read_csv(processed.file)
-        processed.file.seek(0)
-
-        # Step 2: Generate category data dynamically
-        df_categories = generate_category_df_from_processed(df_processed,r)
-
-        # Save categories to in-memory buffer for S3 upload
-        categories_buffer = BytesIO()
-        categories_buffer.write(df_categories.to_csv(index=False).encode('utf-8'))
-        categories_buffer.seek(0)
-
-
+        # df_processed = pd.read_csv(processed.file)
+        # processed.file.seek(0)
         processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId)
-        categories_url = upload_file_to_s3(categories_buffer, "categories", tenantId, locationId)
+        # # Step 2: Generate category data dynamically
+        # # df_categories = await generate_category_df_from_processed(df_processed,r)
+        # tasks = [
+        #     generate_category_df_from_processed(df_processed, r),
+        #     run_models_and_store_outputs(processed_url, tenantId, locationId)
+        # ]
+
+        # try:
+        #     df_categories, _ = await asyncio.gather(*tasks)
+        # except Exception:
+        #     logger.debug(traceback.format_exc())
+        #     return {"Error": "Failed to complete setup tasks."}
+
+        # # Save categories to in-memory buffer for S3 upload
+        # categories_buffer = BytesIO()
+        # categories_buffer.write(df_categories.to_csv(index=False).encode('utf-8'))
+        # categories_buffer.seek(0)
+
+
+        
+        # categories_url = upload_file_to_s3(categories_buffer, "categories", tenantId, locationId)
         # print("Data is stored successfully")
-        try:
-            run_models_and_store_outputs(processed_url, tenantId, locationId)
-        except:
-            logger.debug(traceback.format_exc())
-            return {"Error": "Failed to run the recomendation model."}
         return {
             "message": "Setup completed. You can now safely run the recommendation API.",
             "processed_file_url": processed_url,
@@ -152,15 +157,15 @@ async def recommendation(
         popular_data_dict, popular_names = await get_popular_recommendation(
         db, top_n, popular_model_map[timing_category], filters
         )
-        print(f"Popular names: {popular_names[:5]}")
-        print(f"Sample from popular_data_dict: {list(popular_data_dict.items())[:3]}")
+        # print(f"Popular names: {popular_names[:5]}")
+        # print(f"Sample from popular_data_dict: {list(popular_data_dict.items())[:3]}")
 
 
         assoc_data_dict, assoc_names = await get_association_recommendations(
             db, cart_items, top_n, assoc_model_map[timing_category], filters
         )
-        print(f"association names: {assoc_names[:5]}")
-        print(f"Sample from assoc_data_dict: {list(assoc_data_dict.items())[:3]}")
+        # print(f"association names: {assoc_names[:5]}")
+        # print(f"Sample from assoc_data_dict: {list(assoc_data_dict.items())[:3]}")
 
         aggregator = Aggregation(popular_names, cart_items, categories_dct, current_hr, weather)
         filtered_popular_names = aggregator.get_final_recommendations()

@@ -13,6 +13,7 @@ from models.schema import TenantCreate, TenantFilterRequest, TenantUpdate
 from routes.user_route import PermissionChecker
 
 router = APIRouter(
+    prefix="/api/v2",
     tags=['tenant']
 )
 

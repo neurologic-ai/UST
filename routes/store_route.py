@@ -20,6 +20,7 @@ import httpx
 from configs.manager import settings
 
 router = APIRouter(
+    prefix="/api/v2",
     tags=['store']
 )
 

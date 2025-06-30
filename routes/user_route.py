@@ -15,6 +15,7 @@ from db.singleton import get_engine
 from repos.user_repos import build_nested_and
 
 router = APIRouter(
+    prefix="/api/v2",
     tags=['user']
 )
 

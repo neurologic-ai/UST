@@ -15,7 +15,11 @@ from routes.store_route import router as store_router
 
 def initialize_backend_application() -> fastapi.FastAPI:
     logger.info("Starting FastAPI application")
-    app = FastAPI(docs_url="/api/v2/docs")
+    app = FastAPI(
+        docs_url="/api/v2/docs",
+        redoc_url="/api/v2/redoc",                
+        openapi_url="/api/v2/openapi.json"
+    )
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=2)
     app.add_event_handler("startup", startup_event())
     app.add_event_handler("shutdown", shutdown_event())

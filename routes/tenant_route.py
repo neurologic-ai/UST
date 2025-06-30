@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 from odmantic import AIOEngine
 from bson import ObjectId
-
+from bson.regex import Regex
 from typing import List, Optional
 
 from db.singleton import get_engine
-from models.db import Location, Store, Tenant
-from models.schema import TenantCreate, TenantUpdate
+from models.db import Location, Store, Tenant, UserStatus
+from models.schema import TenantCreate, TenantFilterRequest, TenantUpdate
 from routes.user_route import PermissionChecker
 
 router = APIRouter(
@@ -25,30 +25,26 @@ async def create_tenant(
     authorize:bool=Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
     ):
-    normalized_name = data.tenant_name.strip().lower()
+    normalized_name = data.tenantName.strip().lower()
     existing = await db.find_one(Tenant, Tenant.normalized_name == normalized_name)
     if existing:
         raise HTTPException(status_code=400, detail="Tenant with this name already exists")
     
-    api_key = generate_api_key()
+    if not data.apiKey:
+        api_key = generate_api_key()
+    else:
+        api_key = data.apiKey
 
     tenant = Tenant(
-        tenant_name=data.tenant_name,
+        tenant_name=data.tenantName,
         normalized_name=normalized_name,
         api_key=api_key,
-        locations=[
-            Location(
-                location_id=loc.location_id,
-                name=loc.name,
-                stores=[Store(**store.dict()) for store in loc.stores]
-            )
-            for loc in data.locations
-        ],
+        locations=[],
         created_at= datetime.utcnow(),
         created_by=str(authorize.id),
         updated_at=None,
         updated_by=None,
-        is_active=True
+        status=data.status
     )
 
     await db.save(tenant)
@@ -56,36 +52,43 @@ async def create_tenant(
     return {
         "message": "Tenant created successfully",
         "id": str(tenant.id),
-        "api_key": api_key
+        "tenantName": tenant.tenant_name,
+        "apiKey": api_key
     }
 
 @router.put("/tenant/update")
 async def update_tenant(
     data: TenantUpdate,
-    authorize:bool=Depends(PermissionChecker(['items:write'])),
+    authorize: bool = Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
-    ):
+):
     tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    normalized_name = data.tenant_name.strip().lower()
+    
+    # Check for normalized name conflict with another tenant
+    existing = await db.find_one(
+        Tenant, 
+        (Tenant.normalized_name == normalized_name) & (Tenant.id != tenant.id)
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Another tenant with this name already exists")
+
     tenant.tenant_name = data.tenant_name
-    tenant.locations = [
-        Location(
-            location_id=loc.location_id,
-            name=loc.name,
-            stores=[Store(**store.dict()) for store in loc.stores]
-        )
-        for loc in data.locations
-    ]
+    tenant.normalized_name = normalized_name
+    tenant.api_key = data.api_key
+    tenant.status = data.status
+    tenant.updated_at = datetime.utcnow()
+    tenant.updated_by = str(authorize.id)
 
     await db.save(tenant)
     return {"message": "Tenant updated successfully"}
 
 
-
-@router.delete("/tenant/{tenant_id}")
-async def delete_tenant(
+@router.put("/tenant/disable")
+async def disable_tenant(
     tenant_id: str,
     authorize:bool=Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
@@ -94,11 +97,17 @@ async def delete_tenant(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
     
-    await db.delete(tenant)
-    return {"message": "Tenant deleted successfully"}
+    if tenant.status == UserStatus.INACTIVE:
+        return {"message": "User is already inactive"}
+
+    tenant.status = UserStatus.INACTIVE
+    tenant.updated_at = datetime.utcnow()
+    tenant.updated_by = str(authorize.id)
+    await db.save(tenant)
+    return {"message": f"Tenant '{tenant.tenant_name}' disabled successfully"}
 
 
-@router.get("/tenant/{tenant_id}")
+@router.get("/tenant/get-tenant")
 async def get_tenant(
     tenant_id: str,
     authorize:bool=Depends(PermissionChecker(['items:read'])),
@@ -115,33 +124,18 @@ async def get_tenant(
     return tenant
 
 
-@router.get("/tenant", response_model=List[Tenant])
+@router.post("/tenant/get-all-tenants", response_model=List[Tenant])
 async def list_tenants(
-    authorize:bool=Depends(PermissionChecker(['items:read'])),
-    db: AIOEngine = Depends(get_engine)
-    ):
-    tenants = [t async for t in db.find(Tenant)]
+    filters: TenantFilterRequest,
+    authorize: bool = Depends(PermissionChecker(['items:read'])),
+    db: AIOEngine = Depends(get_engine),
+):
+    query_filter = {}
+
+    if filters.tenant_name:
+        query_filter["tenant_name"] = Regex(f".*{filters.tenant_name}.*", "i")  # case-insensitive match
+    if filters.status:
+        query_filter["status"] = filters.status
+
+    tenants = [t async for t in db.find(Tenant, query_filter)]
     return tenants
-
-
-
-{
-  "locations": [
-    {
-      "location_id": "location_1",
-      "name": "Delhi HQ",
-      "stores": [
-        {
-          "name": "Connaught Place Store",
-          "store_id": "store_1"
-        },
-        {
-          "name": "Saket Store",
-          "store_id": "store_2"
-        }
-      ]
-    }
-      ],
-  "tenant_id": "682c16e8cdcefb98ccd4ebe5",
-  "tenant_name": "Dominos Updated"
-}

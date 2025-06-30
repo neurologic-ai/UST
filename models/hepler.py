@@ -1,19 +1,7 @@
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from loguru import logger
-import pandas as pd
 from configs.constant import EXCLUDE_SUBCATEGORIES, STRICT_CATEGORY_RULES, MONO_CATEGORIES, CROSS_CATEGORIES, TIME_SLOTS, MAX_SUBCATEGORY_LIMIT, CATEGORY_DATA_PATH, WEATHER_FILTERS
-from utils.file_download import download_file_from_s3
-from utils.make_category_csv import normalize_key
-
-# # Use S3 download and read as DataFrame
-# url = ""
-# file_buffer = download_file_from_s3(url)
-# if file_buffer is None:
-#     raise Exception("Failed to load CATEGORY_DATA_PATH from S3.")
-# df_categories = pd.read_csv(file_buffer)
-# Read Categories
-# df_categories = pd.read_csv(CATEGORY_DATA_PATH)
 
 @dataclass
 class Product:
@@ -39,15 +27,6 @@ class Product:
             subcategory=data.get("subcategory"),
             timing=data.get("timing")
         )
-# categories_dct = defaultdict(Product)
-
-# for idx, row in df_categories.iterrows():
-#     p_n = str(row['Product_name']).strip().lower()
-#     cat = str(row['Category']).strip().lower()
-#     scat = str(row['Subcategory']).strip().lower()
-#     tim = str(row['Timing']).strip().lower()
-
-#     categories_dct[p_n] = Product(p_n, cat, scat, tim)
 
 class Aggregation:
     def __init__(self, reco_list, cart_items, categories, current_hour, weather,
@@ -58,11 +37,9 @@ class Aggregation:
                  time_slots = TIME_SLOTS,
                  max_subcategory_limit = MAX_SUBCATEGORY_LIMIT):
         
-        # self.reco_list = reco_list
-        # self.cart_items = cart_items
-        self.reco_list = [normalize_key(p) for p in reco_list]
-        self.cart_items = [normalize_key(p) for p in cart_items]
-
+        self.reco_list = reco_list
+        self.cart_items = cart_items
+        
         self.categories = categories
         self.current_hour = current_hour
         self.weather = weather.lower()
@@ -77,7 +54,7 @@ class Aggregation:
     def exclude_cart_items(self):
         """Remove items already in the cart from the recommendation list."""
         self.reco_list = [p for p in self.reco_list if p not in self.cart_items]
-        logger.debug(self.reco_list)
+        # logger.debug(self.reco_list)
         
     def exclude_obvious_categories(self):
         """Remove products from excluded subcategories."""
@@ -85,7 +62,7 @@ class Aggregation:
             p for p in self.reco_list 
             if self.categories[p.strip()].subcategory not in self.excluded_subcategories
         ]
-        logger.debug(self.reco_list)
+        # logger.debug(self.reco_list)
     
 
     def remove_non_timely_products(self):
@@ -95,13 +72,17 @@ class Aggregation:
             if self.categories[p.strip()].timing not in self.time_slots
             or self.current_hour in range(*self.time_slots[self.categories[p.strip()].timing])
         ]
-        logger.debug(self.reco_list)
+        # logger.debug(self.reco_list)
     def prioritize_associations(self):
         """Prioritize and filter products based on cart items."""
         if not self.cart_items:
             return
 
-        cart_subcats = {self.categories[p.strip()].subcategory for p in self.cart_items if self.categories[p.strip()].subcategory in self.mono_subcategories}
+        # cart_subcats = {self.categories[p.strip()].subcategory for p in self.cart_items if self.categories[p.strip()].subcategory in self.mono_subcategories}
+        cart_subcats = {
+            self.categories[p.strip()].subcategory
+            for p in self.cart_items
+        }
 
         # Remove items in the same mono subcategory
         self.reco_list = [
@@ -128,11 +109,9 @@ class Aggregation:
             prioritized_items = [p for p in self.reco_list 
                                  if self.categories[p.strip()].subcategory in self.cross_subcategories[cart_subcat1]]
 
-            # for prod in prioritized_items:
-            #     print(f"{prod}: {self.categories[prod.strip()].subcategory}")
-
+            
             self.reco_list = prioritized_items + [item for item in self.reco_list if item not in prioritized_items]
-        logger.debug(self.reco_list)
+        # logger.debug(self.reco_list)
 
     def limit_same_category_occurrences(self):
         """Limit the number of products from the same category."""
@@ -146,11 +125,11 @@ class Aggregation:
                 refined_list.append(p)
 
         self.reco_list = refined_list
-        logger.debug(self.reco_list)
+        # logger.debug(self.reco_list)
     
     def exclude_shorter_product_names(self):
         self.reco_list = [item for item in self.reco_list if len(item) > 1]
-        logger.debug(self.reco_list)
+        # logger.debug(self.reco_list)
 
     def filter_by_weather(self):
         """Filter recommendations based on weather conditions."""
@@ -186,20 +165,7 @@ class Aggregation:
         self.limit_same_category_occurrences()
         self.exclude_shorter_product_names()
         self.filter_by_weather() 
-        logger.debug(self.reco_list)
+        # logger.debug(self.reco_list)
         return self.reco_list
         
     
-
-# def enrich_with_upc(items: list[str], name_to_upc_map: dict) -> list[dict]:
-#     return [
-#         {
-#             "name": item,
-#             "upc": name_to_upc_map.get(item.lower(), "")
-#         }
-#         for item in items
-#     ]
-
-
-# def get_product_names_from_upcs(upcs: list[str], upc_to_name_map: dict) -> list[str]:
-#     return [upc_to_name_map.get(upc.strip(), "") for upc in upcs if upc.strip() in upc_to_name_map]

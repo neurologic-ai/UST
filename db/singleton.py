@@ -34,7 +34,7 @@ async def ping():
     await MongoDatabase().command("ping")
 
 async def close_connection():
-    await _MongoClientSingleton().mongo_client.close()
+    _MongoClientSingleton().mongo_client.close()
 
 
 breakfast_association_collection_name = MongoDatabase()['breakfast_association_collection']
@@ -48,6 +48,20 @@ dinner_popular_collection_name = MongoDatabase()['dinner_popular_collection']
 other_popular_collection_name = MongoDatabase()['other_popular_collection']
 
 lookup_collection = MongoDatabase()['lookup_dicts']
+category_cache_collection = MongoDatabase()["category_cache"]
+
+async def create_index():
+    await breakfast_association_collection_name.create_index([("tenant_id", 1), ("location_id", 1), ("store_id", 1)])
+    await lunch_association_collection_name.create_index([("tenant_id", 1), ("location_id", 1), ("store_id", 1)])
+    await dinner_association_collection_name.create_index([("tenant_id", 1), ("location_id", 1), ("store_id", 1)])
+    await other_association_collection_name.create_index([("tenant_id", 1), ("location_id", 1), ("store_id", 1)])
+    await breakfast_popular_collection_name.create_index([("tenant_id", 1), ("location_id", 1), ("store_id", 1)])
+    await lunch_popular_collection_name.create_index([("tenant_id", 1), ("location_id", 1), ("store_id", 1)])
+    await dinner_popular_collection_name.create_index([("tenant_id", 1), ("location_id", 1), ("store_id", 1)])
+    await other_popular_collection_name.create_index([("tenant_id", 1), ("location_id", 1), ("store_id", 1)])
+    await lookup_collection.create_index([("tenant_id", 1), ("location_id", 1)])
+    await category_cache_collection.create_index([("tenant_id", 1), ("location_id", 1)])
+
 
 
 __all__ = ["MongoDatabase", 

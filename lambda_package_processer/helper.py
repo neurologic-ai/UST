@@ -1,13 +1,10 @@
-from __future__ import annotations
-import traceback
 from loguru import logger
 import numpy as np
 import pandas as pd
-from configs.constant import DATE_COL, PRODUCT_NAME_COL, TIMINGS_COL, TIMINGS
+from constant import DATE_COL, PRODUCT_NAME_COL, TIMINGS_COL, TIMINGS
 from typing import Union, Dict, Tuple
-from db.singleton import breakfast_association_collection_name, breakfast_popular_collection_name, dinner_association_collection_name, dinner_popular_collection_name, lookup_collection, lunch_association_collection_name, lunch_popular_collection_name, other_association_collection_name, other_popular_collection_name, category_cache_collection
-from typing import Dict, Tuple
-
+import traceback
+from pymongo.operations import UpdateOne
 
 
 def get_timing(hr, timing_ranges):
@@ -84,10 +81,18 @@ class DataPreprocessor:
         :param df_inp: Input DataFrame.
         :return: Processed DataFrame with cleaned and classified timing.
         """
+        print("🚀 Starting preprocessing")
+        print("🧾 Incoming columns:", df_inp.columns.tolist())
+        df_inp.columns = df_inp.columns.str.strip().str.replace('\ufeff', '')
+        print("🧹 Cleaned columns:", df_inp.columns.tolist())
+        print("🔍 DATE_COL:", DATE_COL)
+        
         # Clean the 'Product_name' column
         if PRODUCT_NAME_COL in df_inp.columns:
             df_inp[PRODUCT_NAME_COL] = df_inp[PRODUCT_NAME_COL].apply(lambda x: x.strip().lower() if isinstance(x, str) else x)
 
+        if DATE_COL not in df_inp.columns:
+            raise KeyError(f"Expected column '{DATE_COL}' not found in DataFrame. Available columns: {df_inp.columns.tolist()}")
         # Apply timing classification
         # df_out = self.timing_classifier.apply_timing_classification(df_inp, datetime_col = DATE_COL, output_col = TIMINGS_COL)
         df_out = vectorized_apply_timing_classification(
@@ -98,7 +103,6 @@ class DataPreprocessor:
         )
         return df_out
     
-
 def convert_numpy_to_native(obj):
     """Recursively convert numpy types to native Python types."""
     if isinstance(obj, dict):
@@ -113,7 +117,6 @@ def convert_numpy_to_native(obj):
         return bool(obj)
     else:
         return obj
-
 
 async def insert_data(collection_name, inp_data, many=True, dataset_name=''):
     print("DEBUG: Type of collection_name:", type(collection_name))
@@ -143,30 +146,17 @@ async def insert_data(collection_name, inp_data, many=True, dataset_name=''):
         if many:
             result = await collection_name.insert_many(inp_data)  
             print(result.acknowledged)
-            # print(f"Insertion successful, inserted IDs: {result.inserted_ids}")
+            print(f"Insertion successful, inserted IDs: {result.inserted_ids}")
         else:
             result = await collection_name.insert_one(inp_data)  
             print(result.acknowledged)
-            # print(f"Insertion successful, inserted ID: {result.inserted_id}")
+            print(f"Insertion successful, inserted ID: {result.inserted_id}")
         print(f"{dataset_name} data stored successfully!")
     except Exception as e:
         print("Insertion failed:", e)
         traceback.print_exc()
 
-
-
-async def load_lookup_dicts(tenant_id, location_id):
-    doc = await lookup_collection.find_one({
-        "tenant_id": tenant_id,
-        "location_id": location_id
-    })
-
-    if doc:
-        return doc.get("name_to_upc", {}), doc.get("upc_to_name", {})
-    else:
-        return {}, {}
-
-
+    
 async def insert_popular_items_dict_style(collection, popular_data: list):
     for item in popular_data:
         tenant_id = item["tenant_id"]
@@ -238,32 +228,3 @@ async def insert_association_items_dict_style(collection, association_data: list
                     },
                     upsert=True
                 )
-
-
-
-async def delete_documents_for_tenant_location(
-    tenant_id: str,
-    location_id: str
-):
-    """
-    Deletes documents matching the given tenant_id and location_id
-    from association and popular collections.
-    """
-    filter_query = {"tenant_id": tenant_id, "location_id": location_id}
-
-    collections = [
-        breakfast_association_collection_name,
-        lunch_association_collection_name,
-        dinner_association_collection_name,
-        other_association_collection_name,
-        breakfast_popular_collection_name,
-        lunch_popular_collection_name,
-        dinner_popular_collection_name,
-        other_popular_collection_name,
-        lookup_collection,
-        category_cache_collection
-    ]
-
-    for collection in collections:
-        result = await collection.delete_many(filter_query)
-        logger.debug(f"Deleted {result.deleted_count} documents from {collection.name}")

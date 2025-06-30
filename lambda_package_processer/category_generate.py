@@ -1,19 +1,17 @@
-from typing import Dict
-from loguru import logger
+# from loguru import logger
 import pandas as pd
-import redis
+from singleton import category_cache_collection
+from manager import settings
+from category_classification import ClassificationService
 
-from db.singleton import MongoDatabase
-from models.db import CategoryCache, CategoryData
-from utils.make_category_csv import ClassificationService
-from configs.manager import settings
-from db.singleton import category_cache_collection
+
 GEMINI_PROJECT = settings.GEMINI_PROJECT
 # logger.debug(GEMINI_PROJECT)
 GEMINI_LOCATION = settings.GEMINI_LOCATION
 # logger.debug(GEMINI_LOCATION)
 GEMINI_SERVICE_ACCOUNT_PATH = settings.GEMINI_SERVICE_ACCOUNT_PATH
 # logger.debug(GEMINI_SERVICE_ACCOUNT_PATH)
+
 
 
 async def generate_category_df_from_processed(processed_df: pd.DataFrame, tenant_id: str, location_id: str):
@@ -44,7 +42,6 @@ async def generate_category_df_from_processed(processed_df: pd.DataFrame, tenant
     }
 
     # Fetch existing document if any
-    
     filter_query = {"tenant_id": tenant_id, "location_id": location_id}
     existing_doc = await category_cache_collection.find_one(filter_query)
 
@@ -63,4 +60,4 @@ async def generate_category_df_from_processed(processed_df: pd.DataFrame, tenant
             "data": category_dict
         }
         await category_cache_collection.insert_one(document)
-
+    

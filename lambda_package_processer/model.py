@@ -1,6 +1,8 @@
 import pandas as pd
 from collections import defaultdict
-from configs.constant import QUANTITY_COL, PRODUCT_NAME_COL, SESSION_COL, UPC_COL
+from constant import QUANTITY_COL, PRODUCT_NAME_COL, SESSION_COL, UPC_COL
+
+
 
 def popular_based(df, tenant_id, top_n=100):
     results = []
@@ -25,7 +27,7 @@ def popular_based(df, tenant_id, top_n=100):
         results.append({
             "tenant_id": tenant_id,
             "location_id": location_id,
-            "store_id": str(store_id),
+            "store_id": store_id,
             "popular_data": popular_data
         })
 
@@ -64,7 +66,7 @@ def association_based(df: pd.DataFrame,tenant_id, top_n=100) -> list:
                     "count": int(count)
                 }
                 for associate_name, count in sorted_associates
-                if associate_name.strip() 
+                if associate_name.strip()
             }
 
             full_result.append({
@@ -74,4 +76,5 @@ def association_based(df: pd.DataFrame,tenant_id, top_n=100) -> list:
                 "product": product,  # key is product name, not UPC
                 "associate_products": associate_products
             })
+
     return full_result

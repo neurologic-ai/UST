@@ -1,23 +1,22 @@
 import asyncio
 import traceback
+from loguru import logger
 import pandas as pd
-from initialize.models import popular_based, association_based
-from initialize.helper import insert_association_items_dict_style, insert_data, DataPreprocessor, insert_popular_items_dict_style
-from configs.constant import TIME_SLOTS, TIMINGS, PROCESSED_DATA_PATH, TIMINGS_COL
-from db.singleton import \
+# from models import popular_based, association_based
+from helper import insert_association_items_dict_style, DataPreprocessor, insert_popular_items_dict_style
+from constant import TIME_SLOTS, TIMINGS, TIMINGS_COL
+from model import association_based, popular_based
+from singleton import \
 breakfast_popular_collection_name, lunch_popular_collection_name, \
 dinner_popular_collection_name, other_popular_collection_name, \
 breakfast_association_collection_name, lunch_association_collection_name, \
 dinner_association_collection_name, other_association_collection_name, lookup_collection
-from loguru import logger
-import time
-
 
 def build_lookup_dicts(df):
+    df['UPC'] = df['UPC'].astype(str)
     name_to_upc = dict(zip(df['Product_name'], df['UPC']))
     upc_to_name = dict(zip(df['UPC'], df['Product_name']))
     return name_to_upc, upc_to_name
-
 
 async def save_lookup_dicts(tenant_id, location_id, name_to_upc, upc_to_name):
     try:
@@ -48,6 +47,8 @@ async def save_lookup_dicts(tenant_id, location_id, name_to_upc, upc_to_name):
         logger.debug(traceback.format_exc())
         raise
 
+
+# Mapping for time slots to collection names
 COLLECTION_MAPPING = {
     "Breakfast": (breakfast_popular_collection_name, breakfast_association_collection_name),
     "Lunch": (lunch_popular_collection_name, lunch_association_collection_name),
@@ -57,7 +58,6 @@ COLLECTION_MAPPING = {
 
 async def process_time_slot(tm, df_filtered, tenant_id):
     try:
-        start_time= time.time()
         logger.debug(f"Processing {tm} recommendation dataset...")
 
         popular_json = popular_based(df_filtered, tenant_id)
@@ -69,34 +69,37 @@ async def process_time_slot(tm, df_filtered, tenant_id):
             insert_popular_items_dict_style(pop_coll, popular_json),
             insert_association_items_dict_style(assoc_coll, association_json)
         )
-        end_time = time.time()
-        time_elapsed = end_time - start_time
-        logger.debug(f"Time taken for inserting time wise data in mongo: {time_elapsed}")
+
         logger.debug(f"{tm} Popular and Association Saved in Mongo")
     except Exception as e:
         logger.debug(f"❌ Error in processing {tm} data: {str(e)}")
         logger.debug(traceback.format_exc())
-        raise
 
 
 
 async def run_models_and_store_outputs(tenant_id, location_id, df: pd.DataFrame = None):
-    if df is None:
-        print("Error: Dataframe must be provided.")
-        return
+    logger.debug("Inside run_models_and_store_outputs")
+    try:
+        if df is None:
+            logger.debug("Error: Dataframe must be provided.")
+            return 
 
-    #Pre-processing dataset
-    preprocessor = DataPreprocessor(TIME_SLOTS)
-    df = preprocessor.preprocess(df)
-        # Build and save lookup dictionaries
-    name_to_upc_map, upc_to_name_map = build_lookup_dicts(df)
-    await save_lookup_dicts(tenant_id, location_id, name_to_upc_map, upc_to_name_map)
+        #Pre-processing dataset
+        preprocessor = DataPreprocessor(TIME_SLOTS)
+        df = preprocessor.preprocess(df)
+        logger.debug("Preprocessing Done")
+            # Build and save lookup dictionaries
+        name_to_upc_map, upc_to_name_map = build_lookup_dicts(df)
+        await save_lookup_dicts(tenant_id, location_id, name_to_upc_map, upc_to_name_map)
+        logger.debug("look_up Dict Saved in Mongo")
+        tasks = []
+        for tm in TIMINGS:
+            df_filtered = df[df[TIMINGS_COL] == tm].copy()
+            tasks.append(process_time_slot(tm, df_filtered, tenant_id))
 
-    tasks = []
-    for tm in TIMINGS:
-        df_filtered = df[df[TIMINGS_COL] == tm].copy()
-        tasks.append(process_time_slot(tm, df_filtered, tenant_id))
-
-    await asyncio.gather(*tasks)
-    logger.debug("✅ All data saved in Mongo")
-    
+        await asyncio.gather(*tasks)
+        logger.debug("✅ All data saved in Mongo")
+        
+    except Exception as e:
+        logger.debug(f"Error occurred: {str(e)}")
+        logger.debug(f"Full traceback:\n{traceback.format_exc()}")

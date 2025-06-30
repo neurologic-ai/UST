@@ -38,4 +38,7 @@ downloads
 test.py
 weather/weather.json
 user.json
-lambda_package.zip
+
+lambda_package_divider/global-bundle.pem
+lambda_package_processer/global-bundle.pem
+lambda_package_processer\user.json

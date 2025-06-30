@@ -1,10 +1,6 @@
 import asyncio
-from collections import defaultdict
-from datetime import datetime
-from io import BytesIO, StringIO
-import pickle
+import time
 from fastapi import APIRouter, Depends, HTTPException
-
 from fastapi.responses import JSONResponse
 from odmantic import AIOEngine
 import redis
@@ -13,21 +9,27 @@ from db.redis_client import get_redis_client
 from models.schema import RecommendationRequestBody
 from models.hepler import Product, Aggregation
 from db.singleton import get_engine
-from repos.reco_repos import get_categories_from_cache_or_s3, get_product_names_from_upcs
-from utils.file_download import download_file_from_s3
-from utils.file_upload import get_s3_file_url, upload_file_to_s3
+from repos.reco_repos import get_categories_from_cache_or_s3
+from utils.file_upload import get_s3_file_url
 from utils.helper import get_association_recommendations, get_popular_recommendation
 from configs.constant import TIME_SLOTS
 from setup import run_models_and_store_outputs
 from fastapi import UploadFile, File
 import pandas as pd
 from models.db import BreakfastPopular, LunchPopular, DinnerPopular, OtherPopular, BreakfastAssociation, LunchAssociation, DinnerAssociation, OtherAssociation
-from initialize.helper import get_timing
+from initialize.helper import delete_documents_for_tenant_location, get_timing
 from utils.save_category_csv import generate_category_df_from_processed
 from loguru import logger
 import traceback
 from initialize.helper import load_lookup_dicts
 from weather.api_call import get_weather_feel
+
+
+
+def normalize_key(name: str) -> str:
+    if not isinstance(name, str):
+        return ""
+    return name.replace('\xa0', ' ').replace('.', '').replace('$','').strip().lower()
 # router = APIRouter(tags=["Recommendation"])
 router = APIRouter(
     prefix="/api/v2",  # version prefix
@@ -46,48 +48,56 @@ async def get_data(
     return data
 
 
+async def process_chunk(df_processed, tenantId, locationId):
+    try:
+        df_processed['Product_name'] = df_processed['Product_name'].map(normalize_key)
+        start_time = time.time()
+        df_categories, _ = await asyncio.gather(
+            generate_category_df_from_processed(df_processed, tenantId, locationId),
+            run_models_and_store_outputs(tenantId, locationId, df_processed)
+        )
+        end_time = time.time()
+        logger.debug(f"Time taken for chunk process: {end_time - start_time}")
+        return (f"Chunk Done")
+    except Exception:
+        logger.debug(traceback.format_exc())
+        return {"Error": "Failed to complete setup tasks."}
+
+
 
 @router.post("/setup")
 async def upload_csvs(
     tenantId: str,
     locationId: str,
     processed: UploadFile = File(...),
-    r: redis.Redis = Depends(get_redis_client)
+    db: AIOEngine = Depends(get_engine)
 ):
     try:
+        await delete_documents_for_tenant_location(tenantId, locationId)
+        
+        CHUNK_SIZE = 10000
+        # List of required columns
+        REQUIRED_COLUMNS = ['Session_id', 'Datetime', 'Product_name','UPC','Quantity','location_id','store_id']  
+
         # Step 1: Read both files into pandas DataFrames
-        df_processed = pd.read_csv(processed.file)
-        processed.file.seek(0)
-        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId)
-        # # Step 2: Generate category data dynamically
-        # # df_categories = await generate_category_df_from_processed(df_processed,r)
-        tasks = [
-            generate_category_df_from_processed(df_processed, r),
-            run_models_and_store_outputs(processed_url, tenantId, locationId)
+        df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str})
+        all_tasks = [
+            process_chunk(df_processed, tenantId, locationId)
+            for df_processed in df_processed_chunks
         ]
 
-        try:
-            df_categories, _ = await asyncio.gather(*tasks)
-        except Exception:
-            logger.debug(traceback.format_exc())
-            return {"Error": "Failed to complete setup tasks."}
-
-        # Save categories to in-memory buffer for S3 upload
-        categories_buffer = BytesIO()
-        categories_buffer.write(df_categories.to_csv(index=False).encode('utf-8'))
-        categories_buffer.seek(0)
-
-
+        # Run all chunk processes concurrently
+        results = await asyncio.gather(*all_tasks)
+        logger.debug("Data is stored successfully")
         
-        categories_url = upload_file_to_s3(categories_buffer, "categories", tenantId, locationId)
-        print("Data is stored successfully")
         return {
             "message": "Setup completed. You can now safely run the recommendation API.",
-            "processed_file_url": processed_url,
+            "processed_file_url": "processed_url",
             "categories_file_url": "categories_url"
         }
     except Exception as e:
         logger.debug(traceback.format_exc())
+        raise
 
 
 
@@ -173,6 +183,8 @@ async def recommendation(
         aggregator = Aggregation(assoc_names, cart_items, categories_dct, current_hr, weather)
         filtered_assoc_names = aggregator.get_final_recommendations()
 
+
+
         if filtered_assoc_names:
             final_recommendation = {
                 "message": "Association Recommendation",
@@ -201,3 +213,4 @@ async def recommendation(
         return final_recommendation
     except:
         logger.debug(traceback.format_exc())
+

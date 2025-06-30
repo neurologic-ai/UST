@@ -20,6 +20,8 @@ class BackendBaseSettings(BaseSettings):
     WEATHER_APIKEY: str = decouple.config("WEATHER_APIKEY")
     REDIS_HOST: str = decouple.config("REDIS_HOST")
     REDIS_PORT: int = decouple.config("REDIS_PORT")
+    GEOCODE_API_KEY: str = decouple.config("GEOCODE_API_KEY")
+    GEOCODE_BASE_URL: str = decouple.config("GEOCODE_BASE_URL")
     
     
     IS_ALLOWED_CREDENTIALS: bool = True

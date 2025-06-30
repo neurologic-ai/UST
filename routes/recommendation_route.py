@@ -113,7 +113,7 @@ async def upload_csvs(
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    r: redis.Redis = Depends(get_redis_client),
+    # r: redis.Redis = Depends(get_redis_client),
     db: AIOEngine = Depends(get_engine)
     ):
     try:
@@ -122,7 +122,7 @@ async def recommendation(
         logger.debug(current_datetime)
         logger.debug(current_hr)
 
-        weather = get_weather_feel(lat=data.latitude, lon=data.longitude,dt=current_datetime, redis_client=r)
+        weather = get_weather_feel(lat=data.latitude, lon=data.longitude,dt=current_datetime)
         logger.debug(weather)
 
         s3_url = get_s3_file_url("categories", data.tenantId, data.locationId)

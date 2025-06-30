@@ -24,13 +24,13 @@ def get_weather_forecast(lat, lon):
         return None
 
 # --- Classify and cache only the "feels like" map ---
-def get_or_set_feels_like_map(lat, lon, redis_client: redis.Redis):
-    redis_key = f"Weather:{lat}:{lon}"
-    logger.debug(redis_key)
-    cached = redis_client.get(redis_key)
+def get_or_set_feels_like_map(lat, lon):
+    # redis_key = f"Weather:{lat}:{lon}"
+    # logger.debug(redis_key)
+    # cached = redis_client.get(redis_key)
 
-    if cached:
-        return json.loads(cached)
+    # if cached:
+    #     return json.loads(cached)
 
     # Fetch and process fresh data
     weather_data = get_weather_forecast(lat, lon)
@@ -57,15 +57,15 @@ def get_or_set_feels_like_map(lat, lon, redis_client: redis.Redis):
         feels_like_map[timestamp] = feel
 
     # Cache for 5 days
-    redis_client.setex(redis_key, 432000, json.dumps(feels_like_map))
+    # redis_client.setex(redis_key, 432000, json.dumps(feels_like_map))
     return feels_like_map
 
 # --- Main function: get "feel" for a given datetime ---
-def get_weather_feel(lat, lon, dt: datetime, redis_client: redis.Redis):
+def get_weather_feel(lat, lon, dt: datetime):
     dt_utc = dt.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
     timestamp_key = dt_utc.isoformat().replace("+00:00", "Z")  # Match Tomorrow.io format
 
-    feels_like_map = get_or_set_feels_like_map(lat, lon, redis_client)
+    feels_like_map = get_or_set_feels_like_map(lat, lon)
     # logger.debug(feels_like_map)
     if not feels_like_map:
         return "moderate"

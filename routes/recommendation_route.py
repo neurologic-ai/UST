@@ -10,7 +10,7 @@ from models.schema import RecommendationRequestBody
 from models.hepler import Product, Aggregation
 from db.singleton import get_engine
 from repos.reco_repos import get_categories_from_cache_or_s3
-from utils.file_upload import get_s3_file_url
+from utils.file_upload import get_s3_file_url, upload_file_to_s3
 from utils.helper import get_association_recommendations, get_popular_recommendation
 from configs.constant import TIME_SLOTS
 from setup import run_models_and_store_outputs
@@ -73,27 +73,29 @@ async def upload_csvs(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        await delete_documents_for_tenant_location(tenantId, locationId)
+        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId)
+
+        ###The below code is for local testing.
+        # await delete_documents_for_tenant_location(tenantId, locationId)
         
-        CHUNK_SIZE = 10000
-        # List of required columns
-        REQUIRED_COLUMNS = ['Session_id', 'Datetime', 'Product_name','UPC','Quantity','location_id','store_id']  
+        # CHUNK_SIZE = 10000
+        # # List of required columns
+        # REQUIRED_COLUMNS = ['Session_id', 'Datetime', 'Product_name','UPC','Quantity','location_id','store_id']  
 
-        # Step 1: Read both files into pandas DataFrames
-        df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str})
-        all_tasks = [
-            process_chunk(df_processed, tenantId, locationId)
-            for df_processed in df_processed_chunks
-        ]
+        # # Step 1: Read both files into pandas DataFrames
+        # df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str})
+        # all_tasks = [
+        #     process_chunk(df_processed, tenantId, locationId)
+        #     for df_processed in df_processed_chunks
+        # ]
 
-        # Run all chunk processes concurrently
-        results = await asyncio.gather(*all_tasks)
-        logger.debug("Data is stored successfully")
+        # # Run all chunk processes concurrently
+        # results = await asyncio.gather(*all_tasks)
+        # logger.debug("Data is stored successfully")
         
         return {
-            "message": "Setup completed. You can now safely run the recommendation API.",
-            "processed_file_url": "processed_url",
-            "categories_file_url": "categories_url"
+            "message": "Sales data has been Uploaded",
+            
         }
     except Exception as e:
         logger.debug(traceback.format_exc())

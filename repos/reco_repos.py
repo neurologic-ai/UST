@@ -51,10 +51,11 @@ async def get_categories_from_cache_or_s3(tenant_id: str, location_id: str, s3_u
 
 async def validate_csv_columns(file: UploadFile, required_columns: list[str]):
     try:
-        contents = await file.read()
-        df = pd.read_csv(pd.io.common.BytesIO(contents))
+        # Use file stream directly without reading full content
+        file.file.seek(0)
+        df = pd.read_csv(file.file, nrows=0)  # Only reads header
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read CSV: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to read CSV header: {str(e)}")
 
     missing = [col for col in required_columns if col not in df.columns]
     if missing:

@@ -28,7 +28,7 @@ EXPECTED_CATEGORY_COLS = {
 }
 
 
-EXCLUDE_SUBCATEGORIES = ['water']
+EXCLUDE_SUBCATEGORIES = ['water', "unknown"]
 
 STRICT_CATEGORY_RULES = {
             'food': ['home decor', 'cloths', 'personal Care', 'medicine', 'toys'],

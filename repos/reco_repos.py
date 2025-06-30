@@ -4,6 +4,8 @@ from odmantic import AIOEngine, Model
 from models.hepler import Product
 from typing import Dict
 from models.db import CategoryCache
+import pandas as pd
+from fastapi import UploadFile, HTTPException
 
 
 async def get_product_names_from_upcs(
@@ -45,4 +47,20 @@ async def get_categories_from_cache_or_s3(tenant_id: str, location_id: str, s3_u
         return categories_dct
 
     return {}
+
+
+async def validate_csv_columns(file: UploadFile, required_columns: list[str]):
+    try:
+        contents = await file.read()
+        df = pd.read_csv(pd.io.common.BytesIO(contents))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read CSV: {str(e)}")
+
+    missing = [col for col in required_columns if col not in df.columns]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required columns: {', '.join(missing)}"
+        )
+
     

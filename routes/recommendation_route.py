@@ -9,7 +9,7 @@ from db.redis_client import get_redis_client
 from models.schema import RecommendationRequestBody
 from models.hepler import Product, Aggregation
 from db.singleton import get_engine
-from repos.reco_repos import get_categories_from_cache_or_s3
+from repos.reco_repos import get_categories_from_cache_or_s3, validate_csv_columns
 from utils.file_upload import get_s3_file_url, upload_file_to_s3
 from utils.helper import get_association_recommendations, get_popular_recommendation
 from configs.constant import TIME_SLOTS
@@ -73,6 +73,12 @@ async def upload_csvs(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        REQUIRED_COLUMNS = ['Session_id', 'Datetime', 'Product_name','UPC','Quantity','location_id','store_id']  
+        # 🔹 Call the validation function
+        await validate_csv_columns(processed, REQUIRED_COLUMNS)
+
+        # 🔹 Reset the file pointer after reading it
+        processed.file.seek(0)
         processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId)
 
         ###The below code is for local testing.
@@ -93,10 +99,10 @@ async def upload_csvs(
         # results = await asyncio.gather(*all_tasks)
         # logger.debug("Data is stored successfully")
         
-        return {
-            "message": "Sales data has been Uploaded",
+        # return {
+        #     "message": "Sales data has been Uploaded",
             
-        }
+        # }
     except Exception as e:
         logger.debug(traceback.format_exc())
         raise

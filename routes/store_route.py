@@ -33,17 +33,32 @@ async def parse_csv_file(file: UploadFile) -> list[dict]:
         raise HTTPException(status_code=400, detail=f"Invalid CSV format: {str(e)}")
 
 
-async def get_lat_lon(query: str, client: httpx.AsyncClient) -> Tuple[Optional[float], Optional[float]]:
-    """Query the geocode API and return lat/lon if available."""
-    try:
-        url = f"{settings.GEOCODE_BASE_URL}?q={query}&api_key={settings.GEOCODE_API_KEY}"
-        response = await client.get(url)
-        if response.status_code == 200:
-            results = response.json()
-            if results:
-                return float(results[0]["lat"]), float(results[0]["lon"])
-    except Exception as e:
-        logger.debug(f"Geocoding failed for query '{query}': {e}")
+async def get_lat_lon(location: str, state: str, country: str, client: httpx.AsyncClient) -> Tuple[Optional[float], Optional[float]]:
+    """Try geocoding with full and partial query inputs, return (lat, lon) or (None, None)."""
+    def build_query(parts: List[str]) -> str:
+        return " ".join([p for p in parts if p]).strip()
+
+    queries = [
+        build_query([location, state, country]),  # full
+        build_query([state, country]),            # fallback
+    ]
+
+    for q in queries:
+        try:
+            url = f"{settings.GEOCODE_BASE_URL}?q={q}&api_key={settings.GEOCODE_API_KEY}"
+            logger.debug(f"[Geocode] Trying query: '{q}'")
+            response = await client.get(url)
+            if response.status_code == 200:
+                results = response.json()
+                if results:
+                    lat = float(results[0].get("lat"))
+                    lon = float(results[0].get("lon"))
+                    logger.debug(f"[Geocode] Success: lat={lat}, lon={lon} for query '{q}'")
+                    return lat, lon
+        except Exception as e:
+            logger.warning(f"[Geocode] Exception for query '{q}': {e}")
+
+    logger.warning(f"[Geocode] All attempts failed for location='{location}', state='{state}', country='{country}'")
     return None, None
 
 
@@ -60,8 +75,8 @@ async def process_row(row: dict, tenant: Tenant, client: httpx.AsyncClient) -> b
     state = row.get("State", "").strip()
 
     # Compose query and get lat/lon
-    query = " ".join([location_name, state, country]).strip()
-    lat, lon = await get_lat_lon(query, client)
+    lat, lon = await get_lat_lon(location_name, state, country, client)
+
 
     # Create new store
     store_data = Store(
@@ -139,10 +154,15 @@ async def edit_store(
                         store.state = data.state
                     if data.country is not None:
                         store.country = data.country
-                    if data.lat is not None:
+                    if data.lat is None or data.lon is None:
+                        async with httpx.AsyncClient() as client:
+                            lat, lon = await get_lat_lon(store.name, store.state, store.country, client)
+                            store.lat = lat
+                            store.lon = lon
+                    else:
                         store.lat = data.lat
-                    if data.lon is not None:
                         store.lon = data.lon
+
                     if data.status is not None:
                         store.status = data.status
 

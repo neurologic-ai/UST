@@ -37,7 +37,7 @@ def normalize_key(name: str) -> str:
 router = APIRouter(
     prefix="/api/v2",  # version prefix
     tags=["Recommendation V2"],
-    # dependencies=[Depends(get_current_tenant)]
+    dependencies=[Depends(get_current_tenant)]
 )
 
 # @router.get("/view data")

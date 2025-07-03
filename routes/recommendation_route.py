@@ -23,7 +23,10 @@ from loguru import logger
 import traceback
 from initialize.helper import load_lookup_dicts
 from weather.api_call import get_weather_feel
-
+import json
+import zipfile
+import io
+import base64
 
 
 def normalize_key(name: str) -> str:
@@ -34,7 +37,7 @@ def normalize_key(name: str) -> str:
 router = APIRouter(
     prefix="/api/v2",  # version prefix
     tags=["Recommendation V2"],
-    dependencies=[Depends(get_current_tenant)]
+    # dependencies=[Depends(get_current_tenant)]
 )
 
 # @router.get("/view data")
@@ -79,6 +82,33 @@ async def upload_csvs(
 
         # 🔹 Reset the file pointer after reading it
         processed.file.seek(0)
+        # df = pd.read_csv(processed.file).iloc[:10000]
+
+        # # 🔹 Prepare payload
+        # payload = {
+        #     "df_processed": df.to_dict(orient="records"),
+        #     "tenant_id": tenantId,
+        #     "location_id": locationId
+        # }
+
+        # # 🔹 JSON -> raw bytes
+        # raw_bytes = json.dumps(payload).encode("utf-8")
+        # raw_size_kb = len(raw_bytes) / 1024
+
+        # # 🔹 Zip + base64
+        # buf = io.BytesIO()
+        # with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        #     zf.writestr("payload.json", raw_bytes)
+        # b64 = base64.b64encode(buf.getvalue())
+        # zipped_size_kb = len(b64) / 1024
+
+        # # ✅ Return size metrics
+        # return {
+        #     "raw_json_size_kb": round(raw_size_kb, 2),
+        #     "zipped_base64_size_kb": round(zipped_size_kb, 2),
+        #     "compression_ratio": round(zipped_size_kb / raw_size_kb, 2)
+        # }
+        
         processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId)
 
         ###The below code is for local testing.
@@ -99,10 +129,10 @@ async def upload_csvs(
         # results = await asyncio.gather(*all_tasks)
         # logger.debug("Data is stored successfully")
         
-        # return {
-        #     "message": "Sales data has been Uploaded",
+        return {
+            "message": "Sales data has been Uploaded",
             
-        # }
+        }
     except Exception as e:
         logger.debug(traceback.format_exc())
         raise
@@ -113,16 +143,23 @@ async def upload_csvs(
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    # r: redis.Redis = Depends(get_redis_client),
+    r: redis.Redis = Depends(get_redis_client),
     db: AIOEngine = Depends(get_engine)
     ):
     try:
+        try:
+            result = r.ping()
+            msg = "Redis is reachable." if result else "No ping response."
+            logger.debug(msg)
+        except redis.RedisError as e:
+            logger.error(f"Redis ping failed: {e}")
+            # return {"status": "error", "message": "Redis ping failed."}
         current_datetime = data.currentDateTime
         current_hr = data.currentHour
         logger.debug(current_datetime)
         logger.debug(current_hr)
 
-        weather = get_weather_feel(lat=data.latitude, lon=data.longitude,dt=current_datetime)
+        weather = get_weather_feel(lat=data.latitude, lon=data.longitude,dt=current_datetime, redis_client=r)
         logger.debug(weather)
 
         s3_url = get_s3_file_url("categories", data.tenantId, data.locationId)
@@ -221,4 +258,3 @@ async def recommendation(
         return final_recommendation
     except:
         logger.debug(traceback.format_exc())
-

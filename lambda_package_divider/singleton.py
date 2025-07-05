@@ -1,4 +1,5 @@
 import os
+from typing import List
 from loguru import logger
 from motor import motor_asyncio, core
 from odmantic import AIOEngine
@@ -171,15 +172,24 @@ __all__ = ["MongoDatabase",
 
 
 
-async def delete_documents_for_tenant_location(
+async def delete_documents_for_tenant_location_and_store_ids(
     tenant_id: str,
-    location_id: str
+    location_id: str,
+    store_ids: List[str]
 ):
     """
-    Deletes documents matching the given tenant_id and location_id
-    from association and popular collections.
+    Deletes documents matching the given tenant_id, location_id, and store_ids
+    from relevant collections.
     """
-    filter_query = {"tenant_id": tenant_id, "location_id": location_id}
+    if not store_ids:
+        logger.debug("No store_ids provided for deletion")
+        return
+
+    filter_query = {
+        "tenant_id": tenant_id,
+        "location_id": location_id,
+        "store_id": {"$in": store_ids}
+    }
 
     collections = [
         breakfast_association_collection_name,
@@ -189,9 +199,7 @@ async def delete_documents_for_tenant_location(
         breakfast_popular_collection_name,
         lunch_popular_collection_name,
         dinner_popular_collection_name,
-        other_popular_collection_name,
-        lookup_collection,
-        category_cache_collection
+        other_popular_collection_name
     ]
 
     for collection in collections:

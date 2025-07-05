@@ -4,7 +4,7 @@ from loguru import logger
 import numpy as np
 import pandas as pd
 from configs.constant import DATE_COL, PRODUCT_NAME_COL, TIMINGS_COL, TIMINGS
-from typing import Union, Dict, Tuple
+from typing import List, Union, Dict, Tuple
 from db.singleton import breakfast_association_collection_name, breakfast_popular_collection_name, dinner_association_collection_name, dinner_popular_collection_name, lookup_collection, lunch_association_collection_name, lunch_popular_collection_name, other_association_collection_name, other_popular_collection_name, category_cache_collection
 from typing import Dict, Tuple
 
@@ -241,15 +241,50 @@ async def insert_association_items_dict_style(collection, association_data: list
 
 
 
-async def delete_documents_for_tenant_location(
+# async def delete_documents_for_tenant_location(
+#     tenant_id: str,
+#     location_id: str
+# ):
+#     """
+#     Deletes documents matching the given tenant_id and location_id
+#     from association and popular collections.
+#     """
+#     filter_query = {"tenant_id": tenant_id, "location_id": location_id}
+
+#     collections = [
+#         breakfast_association_collection_name,
+#         lunch_association_collection_name,
+#         dinner_association_collection_name,
+#         other_association_collection_name,
+#         breakfast_popular_collection_name,
+#         lunch_popular_collection_name,
+#         dinner_popular_collection_name,
+#         other_popular_collection_name,
+#         lookup_collection,
+#         category_cache_collection
+#     ]
+
+#     for collection in collections:
+#         result = await collection.delete_many(filter_query)
+#         logger.debug(f"Deleted {result.deleted_count} documents from {collection.name}")
+async def delete_documents_for_tenant_location_and_store_ids(
     tenant_id: str,
-    location_id: str
+    location_id: str,
+    store_ids: List[str]
 ):
     """
-    Deletes documents matching the given tenant_id and location_id
-    from association and popular collections.
+    Deletes documents matching the given tenant_id, location_id, and store_ids
+    from relevant collections.
     """
-    filter_query = {"tenant_id": tenant_id, "location_id": location_id}
+    if not store_ids:
+        logger.debug("No store_ids provided for deletion")
+        return
+
+    filter_query = {
+        "tenant_id": tenant_id,
+        "location_id": location_id,
+        "store_id": {"$in": store_ids}
+    }
 
     collections = [
         breakfast_association_collection_name,
@@ -259,9 +294,7 @@ async def delete_documents_for_tenant_location(
         breakfast_popular_collection_name,
         lunch_popular_collection_name,
         dinner_popular_collection_name,
-        other_popular_collection_name,
-        lookup_collection,
-        category_cache_collection
+        other_popular_collection_name
     ]
 
     for collection in collections:

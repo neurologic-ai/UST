@@ -12,12 +12,12 @@ class RecommendationRequestBody(BaseModel):
     cartItems: list[str]
     topN: int
     currentHour: int
-    currentDateTime: datetime
-    tenantId: str
+    # currentDateTime: datetime
+    # tenantId: str
     locationId: str
     storeId: str
-    latitude: float
-    longitude: float
+    # latitude: float
+    # longitude: float
     
 
 class UserBase(BaseModel):

@@ -9,7 +9,7 @@ import io
 import zipfile
 import base64
 import traceback
-from singleton import create_index, delete_documents_for_tenant_location
+from singleton import create_index, delete_documents_for_tenant_location_and_store_ids
 
 def clean_json(obj):
     """Recursively replace NaN, inf, -inf with None."""
@@ -51,11 +51,21 @@ async def async_lambda_handler(event):
         parts = key.split('/')
         tenant_id = parts[0]
         location_id = parts[1]
+        filename = parts[2]  # processed_2378_3090_4012.csv
+
+        logger.debug(f"Extracted filename: {filename}")
+
+        # ✅ Extract store_ids from filename
+        base_name = filename.rsplit('.', 1)[0]  # Remove ".csv"
+        prefix_and_ids = base_name.split('_')   # ['processed', '2378', '3090', '4012']
+        store_ids = prefix_and_ids[1:]          # ['2378', '3090', '4012']
+
+        logger.debug(f"Extracted store_ids from key: {store_ids}")
         logger.debug("Attempting to get object from S3...")
         response = s3_client.get_object(Bucket=bucket, Key=key)
         logger.debug("Successfully got object from S3")
         await create_index()
-        await delete_documents_for_tenant_location(tenant_id, location_id)
+        await delete_documents_for_tenant_location_and_store_ids(tenant_id, location_id, store_ids)
         logger.debug("Attempting to read CSV...")
         df_processed_chunks = pd.read_csv(
             response['Body'],

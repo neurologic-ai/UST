@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import time
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -10,14 +11,15 @@ from models.schema import RecommendationRequestBody
 from models.hepler import Product, Aggregation
 from db.singleton import get_engine
 from repos.reco_repos import get_categories_from_cache_or_s3, validate_csv_columns
-from utils.file_upload import get_s3_file_url, upload_file_to_s3
+from routes.user_route import PermissionChecker
+from utils.file_upload import upload_file_to_s3
 from utils.helper import get_association_recommendations, get_popular_recommendation
 from configs.constant import TIME_SLOTS
 from setup import run_models_and_store_outputs
 from fastapi import UploadFile, File
 import pandas as pd
-from models.db import BreakfastPopular, LunchPopular, DinnerPopular, OtherPopular, BreakfastAssociation, LunchAssociation, DinnerAssociation, OtherAssociation
-from initialize.helper import delete_documents_for_tenant_location, get_timing
+from models.db import BreakfastPopular, LunchPopular, DinnerPopular, OtherPopular, BreakfastAssociation, LunchAssociation, DinnerAssociation, OtherAssociation, Tenant
+from initialize.helper import delete_documents_for_tenant_location_and_store_ids, get_timing
 from utils.save_category_csv import generate_category_df_from_processed
 from loguru import logger
 import traceback
@@ -36,8 +38,7 @@ def normalize_key(name: str) -> str:
 # router = APIRouter(tags=["Recommendation"])
 router = APIRouter(
     prefix="/api/v2",  # version prefix
-    tags=["Recommendation V2"],
-    dependencies=[Depends(get_current_tenant)]
+    tags=["Recommendation V2"]
 )
 
 # @router.get("/view data")
@@ -73,46 +74,36 @@ async def upload_csvs(
     tenantId: str,
     locationId: str,
     processed: UploadFile = File(...),
+    authorize: bool = Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        logger.debug("api call started")
         REQUIRED_COLUMNS = ['Session_id', 'Datetime', 'Product_name','UPC','Quantity','location_id','store_id']  
         # 🔹 Call the validation function
         await validate_csv_columns(processed, REQUIRED_COLUMNS)
-
-        # 🔹 Reset the file pointer after reading it
         processed.file.seek(0)
-        # df = pd.read_csv(processed.file).iloc[:10000]
 
-        # # 🔹 Prepare payload
-        # payload = {
-        #     "df_processed": df.to_dict(orient="records"),
-        #     "tenant_id": tenantId,
-        #     "location_id": locationId
-        # }
+        # Step 2: Measure time to extract unique store_ids
+        logger.debug("Extracting unique store_ids started...")
+        start_time = time.perf_counter()
+        store_ids = set()
+        for chunk in pd.read_csv(processed.file, usecols=["store_id"], chunksize=100_000, dtype={"store_id": str}):
+            store_ids.update(chunk["store_id"].dropna())
 
-        # # 🔹 JSON -> raw bytes
-        # raw_bytes = json.dumps(payload).encode("utf-8")
-        # raw_size_kb = len(raw_bytes) / 1024
+        unique_store_ids = list(store_ids)
+        end_time = time.perf_counter()
+        logger.debug(f"Extracted {len(unique_store_ids)} unique store_ids in {end_time - start_time:.2f} seconds")
 
-        # # 🔹 Zip + base64
-        # buf = io.BytesIO()
-        # with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        #     zf.writestr("payload.json", raw_bytes)
-        # b64 = base64.b64encode(buf.getvalue())
-        # zipped_size_kb = len(b64) / 1024
+        # # Step 3: Delete only data for the extracted store_ids
+        # await delete_documents_for_tenant_location_and_store_ids(tenantId, locationId, unique_store_ids)
 
-        # # ✅ Return size metrics
-        # return {
-        #     "raw_json_size_kb": round(raw_size_kb, 2),
-        #     "zipped_base64_size_kb": round(zipped_size_kb, 2),
-        #     "compression_ratio": round(zipped_size_kb / raw_size_kb, 2)
-        # }
-        
-        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId)
+        processed.file.seek(0)  # reset before upload
+        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=unique_store_ids)
+        logger.debug(processed_url)
 
         ###The below code is for local testing.
-        # await delete_documents_for_tenant_location(tenantId, locationId)
+        
         
         # CHUNK_SIZE = 10000
         # # List of required columns
@@ -125,7 +116,7 @@ async def upload_csvs(
         #     for df_processed in df_processed_chunks
         # ]
 
-        # # Run all chunk processes concurrently
+        # # # Run all chunk processes concurrently
         # results = await asyncio.gather(*all_tasks)
         # logger.debug("Data is stored successfully")
         
@@ -144,32 +135,49 @@ async def upload_csvs(
 async def recommendation(
     data: RecommendationRequestBody,
     r: redis.Redis = Depends(get_redis_client),
-    db: AIOEngine = Depends(get_engine)
+    db: AIOEngine = Depends(get_engine),
+    tenant: Tenant = Depends(get_current_tenant)
     ):
     try:
-        try:
-            result = r.ping()
-            msg = "Redis is reachable." if result else "No ping response."
-            logger.debug(msg)
-        except redis.RedisError as e:
-            logger.error(f"Redis ping failed: {e}")
-            # return {"status": "error", "message": "Redis ping failed."}
-        current_datetime = data.currentDateTime
+        # try:
+        #     result = r.ping()
+        #     msg = "Redis is reachable." if result else "No ping response."
+        #     logger.debug(msg)
+        # except redis.RedisError as e:
+        #     logger.error(f"Redis ping failed: {e}")
+        #     # return {"status": "error", "message": "Redis ping failed."}
         current_hr = data.currentHour
+        current_datetime = datetime.utcnow()
+        tenant_id = str(tenant.id)
+
         logger.debug(current_datetime)
         logger.debug(current_hr)
+        logger.debug(tenant_id)
 
-        weather = get_weather_feel(lat=data.latitude, lon=data.longitude,dt=current_datetime, redis_client=r)
+        # Validate location
+        location = next((loc for loc in tenant.locations if loc.location_id == data.locationId), None)
+        if not location:
+            raise HTTPException(status_code=400, detail=f"Invalid location_id: {data.locationId}")
+
+        # Validate store
+        store = next((s for s in location.stores if s.store_id == data.storeId), None)
+        if not store:
+            raise HTTPException(status_code=400, detail=f"Invalid store_id: {data.storeId}")
+
+        if store.lat is None or store.lon is None:
+            raise HTTPException(status_code=400, detail="Store does not have lat/lon info")
+
+        # Get weather using store coordinates
+        weather = get_weather_feel(lat=store.lat, lon=store.lon, dt=current_datetime, redis_client=r)
         logger.debug(weather)
 
-        s3_url = get_s3_file_url("categories", data.tenantId, data.locationId)
-        categories_dct = await get_categories_from_cache_or_s3(data.tenantId, data.locationId, s3_url, db)
+        categories_dct = await get_categories_from_cache_or_s3(tenant_id, data.locationId, db)
 
         final_top_n = data.topN
         top_n = final_top_n + 50
 
         # Load lookup dictionaries for the given tenant and location
-        name_to_upc, upc_to_name = await load_lookup_dicts(data.tenantId, data.locationId)
+        name_to_upc, upc_to_name = await load_lookup_dicts(tenant_id, data.locationId)
 
         if not name_to_upc or not upc_to_name:
             return JSONResponse(
@@ -184,7 +192,7 @@ async def recommendation(
         logger.debug(timing_category)
         
         filters = {
-            "tenant_id": data.tenantId,
+            "tenant_id": tenant_id,
             "location_id": data.locationId,
             "store_id": data.storeId
             # "timing": timing_category

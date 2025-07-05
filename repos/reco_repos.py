@@ -26,7 +26,7 @@ async def get_product_names_from_upcs(
     return [upc_to_name[upc] for upc in upcs if upc in upc_to_name]
 
 
-async def get_categories_from_cache_or_s3(tenant_id: str, location_id: str, s3_url: str, db) -> Dict[str, "Product"]:
+async def get_categories_from_cache_or_s3(tenant_id: str, location_id: str, db) -> Dict[str, "Product"]:
     cache_filter = {"tenant_id": tenant_id, "location_id": location_id}
     cursor = db.find(CategoryCache, cache_filter)
 

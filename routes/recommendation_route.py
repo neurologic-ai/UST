@@ -10,7 +10,7 @@ from db.redis_client import get_redis_client
 from models.schema import RecommendationRequestBody
 from models.hepler import Product, Aggregation
 from db.singleton import get_engine
-from repos.reco_repos import get_categories_from_cache_or_s3, validate_csv_columns
+from repos.reco_repos import get_categories_for_products, get_categories_from_cache_or_s3, validate_csv_columns
 from routes.user_route import PermissionChecker
 from utils.file_upload import upload_file_to_s3
 from utils.helper import get_association_recommendations, get_popular_recommendation
@@ -98,19 +98,19 @@ async def upload_csvs(
         # # Step 3: Delete only data for the extracted store_ids
         # await delete_documents_for_tenant_location_and_store_ids(tenantId, locationId, unique_store_ids)
 
-        # processed.file.seek(0)  # reset before upload
-        # processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=unique_store_ids)
+        processed.file.seek(0)  # reset before upload
+        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=unique_store_ids)
         # logger.debug(processed_url)
 
         ###The below code is for local testing.
         
         
-        # CHUNK_SIZE = 10000
+        # CHUNK_SIZE = 1000000
         # # List of required columns
         # REQUIRED_COLUMNS = ['Session_id', 'Datetime', 'Product_name','UPC','Quantity','location_id','store_id']  
 
         # # Step 1: Read both files into pandas DataFrames
-        # df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str})
+        # df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str, "location_id": str})
         # all_tasks = [
         #     process_chunk(df_processed, tenantId, locationId)
         #     for df_processed in df_processed_chunks
@@ -139,13 +139,7 @@ async def recommendation(
     tenant: Tenant = Depends(get_current_tenant)
     ):
     try:
-        # try:
-        #     result = r.ping()
-        #     msg = "Redis is reachable." if result else "No ping response."
-        #     logger.debug(msg)
-        # except redis.RedisError as e:
-        #     logger.error(f"Redis ping failed: {e}")
-        #     # return {"status": "error", "message": "Redis ping failed."}
+        start_time = time.perf_counter()
         current_hr = data.currentHour
         current_datetime = datetime.utcnow()
         tenant_id = str(tenant.id)
@@ -170,12 +164,6 @@ async def recommendation(
         # Get weather using store coordinates
         weather = await get_weather_feel(lat=store.lat, lon=store.lon, dt=current_datetime, redis_client=r)
         logger.debug(weather)
-
-        categories_dct = await get_categories_from_cache_or_s3(tenant_id, data.locationId, db)
-
-        final_top_n = data.topN
-        top_n = final_top_n + 50
-
         # Load lookup dictionaries for the given tenant and location
         name_to_upc, upc_to_name = await load_lookup_dicts(tenant_id, data.locationId)
 
@@ -184,6 +172,11 @@ async def recommendation(
                 status_code=404,
                 content={"message": "Lookup dictionaries not found for given tenant and location."}
             )
+
+        # categories_dct = await get_categories_from_cache_or_s3(tenant_id, data.locationId, db)
+
+        final_top_n = data.topN
+        top_n = final_top_n + 50
 
 
         # current_hr = data.currentHour
@@ -224,25 +217,25 @@ async def recommendation(
 
         popular_data_dict, popular_names = popular_result
         assoc_data_dict, assoc_names = assoc_result
-        # print(f"Cart UPCs: {data.cartItems}")
-        # print(f"Cart product names from UPCs: {cart_items}")
+        all_required_names = set(popular_names + assoc_names + cart_items)
+        categories_dct = await get_categories_for_products(list(all_required_names), tenant_id, data.locationId, db)
 
+        # aggregator = Aggregation(popular_names, cart_items, categories_dct, current_hr, weather)
+        # filtered_popular_names = aggregator.get_final_recommendations()
 
-        # popular_data_dict, popular_names = await get_popular_recommendation(
-        # db, top_n, popular_model_map[timing_category], filters
-        # )
-        
+        # aggregator = Aggregation(assoc_names, cart_items, categories_dct, current_hr, weather)
+        # filtered_assoc_names = aggregator.get_final_recommendations()
 
-        # assoc_data_dict, assoc_names = await get_association_recommendations(
-        #     db, cart_items, top_n, assoc_model_map[timing_category], filters
-        # )
-        
-        aggregator = Aggregation(popular_names, cart_items, categories_dct, current_hr, weather)
-        filtered_popular_names = aggregator.get_final_recommendations()
+        # ✅ Define helper function locally
+        async def run_aggregation(name_list, cart_items, categories, current_hr, weather):
+            aggregator = Aggregation(name_list, cart_items, categories, current_hr, weather)
+            return aggregator.get_final_recommendations()
 
-        aggregator = Aggregation(assoc_names, cart_items, categories_dct, current_hr, weather)
-        filtered_assoc_names = aggregator.get_final_recommendations()
-
+        # ✅ Run both aggregations concurrently
+        filtered_popular_names, filtered_assoc_names = await asyncio.gather(
+            run_aggregation(popular_names, cart_items, categories_dct, current_hr, weather),
+            run_aggregation(assoc_names, cart_items, categories_dct, current_hr, weather),
+        )
 
 
         if filtered_assoc_names:
@@ -269,6 +262,11 @@ async def recommendation(
                     if name in popular_data_dict
                 ][:data.topN]
             }
+        end_time = time.perf_counter()
+        logger.debug(f"start_time: {start_time}")
+        logger.debug(f"end_time: {end_time}")
+        logger.debug(f"elapsed: {end_time - start_time:.3f} seconds")
+
 
         return final_recommendation
     except:

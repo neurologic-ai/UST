@@ -1,4 +1,4 @@
-from typing import Type
+from typing import List, Type
 from loguru import logger
 from odmantic import AIOEngine, Model
 from models.hepler import Product
@@ -65,3 +65,31 @@ async def validate_csv_columns(file: UploadFile, required_columns: list[str]):
         )
 
     
+async def get_categories_for_products(
+    product_names: List[str], tenant_id: str, location_id: str, db
+) -> Dict[str, Product]:
+    """
+    Returns category metadata only for the given list of product names.
+    """
+    cache_filter = {"tenant_id": tenant_id, "location_id": location_id}
+    cursor = db.find(CategoryCache, cache_filter)
+
+    name_set = set(p.strip() for p in product_names)
+    categories_dct: Dict[str, Product] = {}
+
+    async for doc in cursor:
+        if not doc.data:
+            continue
+        for name, data in doc.data.items():
+            name = name.strip()
+            if name in name_set:
+                categories_dct[name] = Product.from_dict({
+                    "name": data.name,
+                    "category": data.category,
+                    "subcategory": data.subcategory,
+                    "timing": data.timing
+                })
+                if len(categories_dct) == len(name_set):
+                    return categories_dct  # Early exit if all found
+
+    return categories_dct

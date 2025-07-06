@@ -55,7 +55,7 @@ async def get_lat_lon(location: str, state: str, country: str, client: httpx.Asy
 
             try:
                 results = response.json()
-                logger.debug(f"[Geocode] Response: {results}")
+                # logger.debug(f"[Geocode] Response: {results}")
             except Exception as parse_error:
                 logger.error(f"[Geocode] JSON parse error: {parse_error} | Raw: {response.text}")
                 continue

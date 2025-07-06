@@ -140,3 +140,28 @@ async def list_tenants(
 
     tenants = [t async for t in db.find(Tenant, query_filter)]
     return tenants
+
+
+@router.post("/tenant/regenerate-api-key")
+async def regenerate_api_key(
+    tenant_id: str,
+    authorize: bool = Depends(PermissionChecker(['items:write'])),
+    db: AIOEngine = Depends(get_engine)
+):
+    tenant = await db.find_one(Tenant, Tenant.id == tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    new_api_key = generate_api_key()
+    tenant.api_key = new_api_key
+    tenant.updated_at = datetime.utcnow()
+    tenant.updated_by = str(authorize.id)
+
+    await db.save(tenant)
+
+    return {
+        "message": "API key regenerated successfully",
+        "tenantId": str(tenant.id),
+        "tenantName": tenant.tenant_name,
+        "apiKey": new_api_key
+    }

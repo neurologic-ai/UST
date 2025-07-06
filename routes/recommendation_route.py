@@ -4,7 +4,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from odmantic import AIOEngine
-import redis
+import redis.asyncio as redis
 from auth.api_key import get_current_tenant
 from db.redis_client import get_redis_client
 from models.schema import RecommendationRequestBody
@@ -98,9 +98,9 @@ async def upload_csvs(
         # # Step 3: Delete only data for the extracted store_ids
         # await delete_documents_for_tenant_location_and_store_ids(tenantId, locationId, unique_store_ids)
 
-        processed.file.seek(0)  # reset before upload
-        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=unique_store_ids)
-        logger.debug(processed_url)
+        # processed.file.seek(0)  # reset before upload
+        # processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=unique_store_ids)
+        # logger.debug(processed_url)
 
         ###The below code is for local testing.
         
@@ -168,7 +168,7 @@ async def recommendation(
             raise HTTPException(status_code=400, detail="Store does not have lat/lon info")
 
         # Get weather using store coordinates
-        weather = get_weather_feel(lat=store.lat, lon=store.lon, dt=current_datetime, redis_client=r)
+        weather = await get_weather_feel(lat=store.lat, lon=store.lon, dt=current_datetime, redis_client=r)
         logger.debug(weather)
 
         categories_dct = await get_categories_from_cache_or_s3(tenant_id, data.locationId, db)
@@ -212,24 +212,31 @@ async def recommendation(
         }
         # UPC → product name
         cart_items = [name.lower() for name in (upc_to_name.get(upc) for upc in data.cartItems) if name]
-
-        print(f"Cart UPCs: {data.cartItems}")
-        print(f"Cart product names from UPCs: {cart_items}")
-
-
-        popular_data_dict, popular_names = await get_popular_recommendation(
-        db, top_n, popular_model_map[timing_category], filters
+        # Run both functions concurrently
+        (popular_result, assoc_result) = await asyncio.gather(
+            get_popular_recommendation(
+                db, top_n, popular_model_map[timing_category], filters
+            ),
+            get_association_recommendations(
+                db, cart_items, top_n, assoc_model_map[timing_category], filters
+            )
         )
-        # print(f"Popular names: {popular_names[:5]}")
-        # print(f"Sample from popular_data_dict: {list(popular_data_dict.items())[:3]}")
+
+        popular_data_dict, popular_names = popular_result
+        assoc_data_dict, assoc_names = assoc_result
+        # print(f"Cart UPCs: {data.cartItems}")
+        # print(f"Cart product names from UPCs: {cart_items}")
 
 
-        assoc_data_dict, assoc_names = await get_association_recommendations(
-            db, cart_items, top_n, assoc_model_map[timing_category], filters
-        )
-        # print(f"association names: {assoc_names[:5]}")
-        # print(f"Sample from assoc_data_dict: {list(assoc_data_dict.items())[:3]}")
+        # popular_data_dict, popular_names = await get_popular_recommendation(
+        # db, top_n, popular_model_map[timing_category], filters
+        # )
+        
 
+        # assoc_data_dict, assoc_names = await get_association_recommendations(
+        #     db, cart_items, top_n, assoc_model_map[timing_category], filters
+        # )
+        
         aggregator = Aggregation(popular_names, cart_items, categories_dct, current_hr, weather)
         filtered_popular_names = aggregator.get_final_recommendations()
 
@@ -266,3 +273,4 @@ async def recommendation(
         return final_recommendation
     except:
         logger.debug(traceback.format_exc())
+        raise

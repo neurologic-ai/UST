@@ -21,18 +21,3 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
                 }
             )
         
-
-
-# class APIKeyQueryMiddleware(BaseHTTPMiddleware):
-#     async def dispatch(self, request: Request, call_next):
-#         if request.url.path in ["/docs", "/redoc", "/openapi.json"]:
-#             return await call_next(request)
-#         api_key = request.query_params.get("api_key")
-#         logger.debug(api_key)
-#         logger.debug(API_KEY)
-#         if api_key != API_KEY:
-#             return JSONResponse(
-#                 status_code=401,
-#                 content={"detail": "Unauthorized - Invalid or missing API key"}
-#             )
-#         return await call_next(request)

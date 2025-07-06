@@ -32,10 +32,6 @@ async def authenticate_user(db: AIOEngine, username: str, password: str) -> PyUs
                     detail='Invalid credentials'
                 )
     user = await db.find_one(User,User.username == username)
-    # if user and bcrypt.checkpw(password.encode(), user.password.encode()):
-    #     return user
-        
-    # raise exception
     if user:
         if user.status != UserStatus.ACTIVE:
             raise HTTPException(

@@ -241,32 +241,6 @@ async def insert_association_items_dict_style(collection, association_data: list
 
 
 
-# async def delete_documents_for_tenant_location(
-#     tenant_id: str,
-#     location_id: str
-# ):
-#     """
-#     Deletes documents matching the given tenant_id and location_id
-#     from association and popular collections.
-#     """
-#     filter_query = {"tenant_id": tenant_id, "location_id": location_id}
-
-#     collections = [
-#         breakfast_association_collection_name,
-#         lunch_association_collection_name,
-#         dinner_association_collection_name,
-#         other_association_collection_name,
-#         breakfast_popular_collection_name,
-#         lunch_popular_collection_name,
-#         dinner_popular_collection_name,
-#         other_popular_collection_name,
-#         lookup_collection,
-#         category_cache_collection
-#     ]
-
-#     for collection in collections:
-#         result = await collection.delete_many(filter_query)
-#         logger.debug(f"Deleted {result.deleted_count} documents from {collection.name}")
 async def delete_documents_for_tenant_location_and_store_ids(
     tenant_id: str,
     location_id: str,

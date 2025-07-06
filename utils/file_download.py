@@ -61,39 +61,6 @@ def parse_s3_url(url):
         raise ValueError("URL is not a valid S3 URL.")
 
 
-# import boto3
-# from botocore.exceptions import NoCredentialsError
-# from urllib.parse import urlparse
-# import os
-
-# def download_file_from_s3(url, local_path):
-#     """
-#     Downloads a file from S3 and saves it to the specified local path.
-
-#     :param url: The S3 URL of the file (e.g., s3://bucket-name/path/to/file).
-#     :param local_path: The full local file path where the file should be saved.
-#     :return: True if download is successful, False otherwise.
-#     """
-#     s3_client = boto3.client('s3')
-
-#     try:
-#         # Parse S3 URL
-#         bucket, key = parse_s3_url(url)
-#         # Ensure the local directory exists
-#         os.makedirs(os.path.dirname(local_path), exist_ok=True)
-
-#         # Download file
-#         s3_client.download_file(bucket, key, local_path)
-#         print(f"File downloaded successfully from {url} to {local_path}")
-#         return True
-
-#     except NoCredentialsError:
-#         print("AWS credentials not available.")
-#         return False
-#     except Exception as e:
-#         print(f"Error downloading file: {e}")
-#         return False
-
 
 # Example usage
 if __name__ == "__main__":

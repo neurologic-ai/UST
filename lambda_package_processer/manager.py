@@ -5,8 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class BackendBaseSettings(BaseSettings):
     
     MONGO_URI: str = os.environ.get("MONGO_URI")
-    DB_NAME: str = os.environ.get("DB_NAME") 
-    # CATEGORY_DATA_LOCATION: str = os.environ.get("CATEGORY_DATA_LOCATION") 
+    DB_NAME: str = os.environ.get("DB_NAME")  
     api_key: str = os.environ.get("API_KEY")
     bucket_name: str = os.environ.get("BUCKET_NAME")
     aws_access_key_id: str = os.environ.get("ACCESS_KEY_ID")
@@ -16,10 +15,7 @@ class BackendBaseSettings(BaseSettings):
     GEMINI_SERVICE_ACCOUNT_PATH: str = os.environ.get("GEMINI_SERVICE_ACCOUNT_PATH")
     GEMINI_API_SCOPE: str = os.environ.get("GEMINI_API_SCOPE")
     GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL")
-    # WEATHER_URL: str = os.environ.get("WEATHER_URL")
-    # WEATHER_APIKEY: str = os.environ.get("WEATHER_APIKEY")
-    # REDIS_HOST: str = os.environ.get("REDIS_HOST")
-    # REDIS_PORT: int = os.environ.get("REDIS_PORT")
+
     
     IS_ALLOWED_CREDENTIALS: bool = True
     # get the list of allowed origins from the environment variable

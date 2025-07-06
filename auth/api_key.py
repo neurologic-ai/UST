@@ -7,20 +7,11 @@ from configs.manager import settings
 from db.singleton import get_engine
 from models.db import Tenant
 
-# API_KEY = settings.api_key
+
 API_KEY_NAME = "api_key"
 
-# Define the query-based security
-api_key_query = APIKeyQuery(name=API_KEY_NAME, auto_error=False)
 
-# # Dependency to validate API key
-# def get_api_key(api_key: str = Security(api_key_query)):
-#     if api_key == API_KEY:
-#         return api_key
-#     else:
-#         raise HTTPException(
-#             status_code=401, detail="Invalid or missing API Key"
-#         )
+api_key_query = APIKeyQuery(name=API_KEY_NAME, auto_error=False)
 
 async def get_current_tenant(
     api_key: str = Security(api_key_query),

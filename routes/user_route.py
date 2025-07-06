@@ -1,5 +1,7 @@
 import datetime
 from operator import and_
+import re
+import traceback
 from typing import Any, List
 
 import bcrypt
@@ -96,37 +98,46 @@ async def create_user(
     authorize: User = Depends(PermissionChecker(['users:write'])),
     db: AIOEngine = Depends(get_engine)
 ):
-    logger.debug(authorize)
-    # Check if username already exists (optional but safe)
-    existing_user = await db.find_one(User, User.username == user.username)
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already exists")
+    try:
+        if not re.fullmatch(r"[A-Za-z ]+", user.name):
+            raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
 
-    # Hash the password and convert bytes to str
-    hashed_password = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
+        # Check if username already exists (optional but safe)
+        existing_user = await db.find_one(User, User.username == user.username)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already exists")
 
-    # Create User instance
-    new_user = User(
-        username=user.username,
-        password=hashed_password,
-        permissions=['items:read', 'items:write', 'users:read', 'users:write'],
-        role=user.role,
-        name=user.name,
-        tenant_id=user.tenant_id,
-        created_at=datetime.datetime.utcnow(),
-        created_by=str(authorize.id)
-    )
+        # Hash the password and convert bytes to str
+        hashed_password = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
 
-    await db.save(new_user)
-    return {"message": "User created successfully", "username": new_user.username}
- 
+        # Create User instance
+        new_user = User(
+            username=user.username,
+            password=hashed_password,
+            permissions=['items:read', 'items:write', 'users:read', 'users:write'],
+            role=user.role,
+            name=user.name,
+            tenant_id=user.tenant_id,
+            created_at=datetime.datetime.utcnow(),
+            created_by=str(authorize.id)
+        )
+
+        await db.save(new_user)
+        return {"message": "User created successfully", "username": new_user.username}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+    
 
 
 @router.get('/users/me')
 def get_user(current_user: PyUser = Depends(get_current_user)):
     return current_user
 
-from fastapi.security import OAuth2PasswordRequestForm
 
 @router.post('/token')
 async def token(
@@ -145,75 +156,99 @@ async def edit_user(
     authorize: User = Depends(PermissionChecker(["users:write"])),
     db: AIOEngine = Depends(get_engine)
 ):
-    existing_user = await db.find_one(User, User.username == user_update.username)
+    try:
+        if not user_update.username:
+            raise HTTPException(status_code=400, detail="Username is required")
 
-    if not existing_user:
-        raise HTTPException(status_code=404, detail="User not found")
+        existing_user = await db.find_one(User, User.username == user_update.username)
 
-    # Update fields if provided
-    if user_update.password:
-        existing_user.password = bcrypt.hashpw(user_update.password.encode(), bcrypt.gensalt()).decode()
-    if user_update.role is not None:
-        existing_user.role = user_update.role
-    if user_update.name is not None:
-        existing_user.name = user_update.name
-    if user_update.tenant_id is not None:
-        existing_user.tenant_id = user_update.tenant_id
-    if user_update.status is not None:
-        existing_user.status = user_update.status
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if not re.fullmatch(r"[A-Za-z ]+", user_update.name):
+            raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
 
-    existing_user.updated_at = datetime.datetime.utcnow()
-    
-    existing_user.updated_by = str(authorize.id)
 
-    await db.save(existing_user)
+        # Update fields if provided
+        if user_update.password:
+            existing_user.password = bcrypt.hashpw(user_update.password.encode(), bcrypt.gensalt()).decode()
+        if user_update.role is not None:
+            existing_user.role = user_update.role
+        if user_update.name is not None:
+            existing_user.name = user_update.name
+        if user_update.tenant_id is not None:
+            existing_user.tenant_id = user_update.tenant_id
+        if user_update.status is not None:
+            existing_user.status = user_update.status
 
-    return {"message": "User updated successfully", "username": existing_user.username}
+        existing_user.updated_at = datetime.datetime.utcnow()
+        existing_user.updated_by = str(authorize.id)
+
+        await db.save(existing_user)
+
+        return {"message": "User updated successfully", "username": existing_user.username}
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.put("/users/disable")
 async def disable_user(
     username: str,
-    authorize: bool = Depends(PermissionChecker(["users:write"])),
+    authorize: User = Depends(PermissionChecker(["users:write"])),
     db: AIOEngine = Depends(get_engine)
 ):
-    user = await db.find_one(User, User.username == username)
+    try:
+        if not username:
+            raise HTTPException(status_code=400, detail="Username is required")
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = await db.find_one(User, User.username == username)
 
-    if user.status == UserStatus.INACTIVE:
-        return {"message": "User is already inactive"}
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    user.status = UserStatus.INACTIVE
-    user.updated_at = datetime.datetime.utcnow()
-    user.updated_by = str(authorize.id)
-    await db.save(user)
+        if user.status == UserStatus.INACTIVE:
+            return {"message": "User is already inactive"}
 
-    return {"message": f"User '{username}' disabled successfully"}
+        user.status = UserStatus.INACTIVE
+        user.updated_at = datetime.datetime.utcnow()
+        user.updated_by = str(authorize.id)
+        await db.save(user)
+
+        return {"message": f"User '{username}' disabled successfully"}
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/users/list", response_model=List[User])
 async def list_users(
     filters: UserFilterRequest,
-    authorize: bool = Depends(PermissionChecker(["users:read"])),
+    authorize: User = Depends(PermissionChecker(["users:read"])),
     db: AIOEngine = Depends(get_engine)
 ):
-    query_parts = []
+    try:
+        query_parts = []
 
-    if filters.tenant_id:
-        query_parts.append(User.tenant_id == filters.tenant_id)
+        if filters.tenant_id:
+            query_parts.append(User.tenant_id == filters.tenant_id)
+        if filters.status:
+            query_parts.append(User.status == filters.status)
+        if filters.role:
+            query_parts.append(User.role == filters.role)
+        if filters.name:
+            query_parts.append(User.name == filters.name)
 
-    if filters.status:
-        query_parts.append(User.status == filters.status)
+        final_query = build_nested_and(query_parts)
+        users = await db.find(User, final_query)
 
-    if filters.role:
-        query_parts.append(User.role == filters.role)
+        return users
 
-    if filters.name:
-        query_parts.append(User.name == filters.name)
-
-    final_query = build_nested_and(query_parts)
-    users = await db.find(User, final_query)
-
-    return users
+    except Exception as e:
+        logger.debug(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

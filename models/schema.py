@@ -83,7 +83,7 @@ class LocationModel(BaseModel):
 
 class TenantCreate(BaseModel):
     tenantName: str
-    status: str
+    status: UserStatus
     apiKey: Optional[str] = None
     
 

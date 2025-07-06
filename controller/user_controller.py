@@ -1,12 +1,5 @@
-# import datetime
-# from typing import Any
-
 import bcrypt
 from fastapi import HTTPException, status
-# from fastapi.security import OAuth2PasswordBearer
-# from odmantic import AIOEngine, Model
-# from motor.motor_asyncio import AsyncIOMotorClient
-# from pydantic import BaseModel
 
 async def authenticate_user(username: str, password: str) -> PyUser:
     exception = HTTPException(

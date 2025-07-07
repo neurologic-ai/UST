@@ -143,7 +143,8 @@ async def recommendation(
             raise HTTPException(status_code=400, detail="Store does not have lat/lon info")
 
         # Get weather using store coordinates
-        weather = await get_weather_feel(lat=store.lat, lon=store.lon, dt=current_datetime, redis_client=r)
+        # weather = await get_weather_feel(lat=store.lat, lon=store.lon, dt=current_datetime, redis_client=r)
+        weather = "moderate"
         logger.debug(weather)
         # Load lookup dictionaries for the given tenant and location
         name_to_upc, upc_to_name = await load_lookup_dicts(tenant_id, data.locationId)

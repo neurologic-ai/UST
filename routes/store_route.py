@@ -163,38 +163,70 @@ async def upload_stores_from_csv(
 
 
 @router.put("/tenant/store/edit")
-async def edit_store(data: StoreEditRequest, authorize: User = Depends(PermissionChecker(['items:write'])), db: AIOEngine = Depends(get_engine)):
+async def edit_store(
+    data: StoreEditRequest,
+    authorize: User = Depends(PermissionChecker(['items:write'])),
+    db: AIOEngine = Depends(get_engine)
+):
     try:
         if not ObjectId.is_valid(data.tenant_id):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
+
         tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
 
-        for loc in tenant.locations:
-            if loc.location_id == data.location_id:
-                for store in loc.stores:
-                    if store.store_id == data.store_id:
-                        if data.name is not None:
-                            store.name = data.name
-                        if data.state is not None:
-                            store.state = data.state
-                        if data.country is not None:
-                            store.country = data.country
-                        if data.lat is None or data.lon is None:
-                            async with httpx.AsyncClient() as client:
-                                lat, lon = await get_lat_lon(store.name, store.state, store.country, client)
-                                store.lat = lat
-                                store.lon = lon
-                        else:
-                            store.lat = data.lat
-                            store.lon = data.lon
-                        if data.status is not None:
-                            store.status = data.status
-                        await db.save(tenant)
-                        return {"message": "Store updated successfully"}
-                raise HTTPException(status_code=404, detail="Store not found")
-        raise HTTPException(status_code=404, detail="Location not found")
+        # Locate the correct location
+        location = next((loc for loc in tenant.locations if loc.location_id == data.location_id), None)
+        if not location:
+            raise HTTPException(status_code=404, detail="Location not found")
+
+        # Locate the correct store
+        store = next((s for s in location.stores if s.store_id == data.store_id), None)
+        if not store:
+            raise HTTPException(status_code=404, detail="Store not found")
+
+        updated = False
+
+        if data.name is not None:
+            if not data.name.strip():
+                raise HTTPException(status_code=400, detail="Store name cannot be empty")
+            store.name = data.name.strip()
+            updated = True
+
+        if data.state is not None:
+            if not data.state.strip():
+                raise HTTPException(status_code=400, detail="State cannot be empty")
+            store.state = data.state.strip()
+            updated = True
+
+        if data.country is not None:
+            if not data.country.strip():
+                raise HTTPException(status_code=400, detail="Country cannot be empty")
+            store.country = data.country.strip()
+            updated = True
+
+        # if data.lat is None or data.lon is None:
+        #     async with httpx.AsyncClient() as client:
+        #         lat, lon = await get_lat_lon(store.name, store.state, store.country, client)
+        #         store.lat = lat
+        #         store.lon = lon
+        #     updated = True
+        # else:
+        #     store.lat = data.lat
+        #     store.lon = data.lon
+        #     updated = True
+
+        # if data.status is not None:
+        #     store.status = data.status
+        #     updated = True
+
+        if not updated:
+            raise HTTPException(status_code=400, detail="No fields provided to update")
+
+        await db.save(tenant)
+
+        return {"message": "Store updated successfully"}
 
     except HTTPException:
         raise
@@ -216,6 +248,8 @@ async def disable_store(data: StoreDisableRequest, authorize: User = Depends(Per
             if loc.location_id == data.location_id:
                 for store in loc.stores:
                     if store.store_id == data.store_id:
+                        if store.status == UserStatus.INACTIVE:
+                            return {"message": "Store is already inactive"}
                         store.status = UserStatus.INACTIVE
                         tenant.updated_at = datetime.utcnow()
                         tenant.updated_by = str(authorize.id)
@@ -239,7 +273,7 @@ async def list_stores(
 ):
     try:
         if not ObjectId.is_valid(filters.tenant_id):
-            raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+            raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
         tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenant_id))
         if not tenant:
@@ -276,7 +310,7 @@ async def list_locations(
 ):
     try:
         if not ObjectId.is_valid(filters.tenant_id):
-            raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+            raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
         tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenant_id))
         if not tenant:
@@ -307,7 +341,7 @@ async def add_location(
 ):
     try:
         if not ObjectId.is_valid(data.tenant_id):
-            raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+            raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
         tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
         if not tenant:
@@ -315,6 +349,12 @@ async def add_location(
 
         if any(loc.location_id == data.location_id for loc in tenant.locations):
             raise HTTPException(status_code=400, detail="Location already exists")
+        if not data.location_id or not data.location_id.strip():
+            raise HTTPException(status_code=400, detail="Location ID is required and cannot be empty")
+
+        if not data.name or not data.name.strip():
+            raise HTTPException(status_code=400, detail="Location name is required and cannot be empty")
+
 
         tenant.locations.append(Location(
             location_id=data.location_id,
@@ -341,7 +381,7 @@ async def add_store(
 ):
     try:
         if not ObjectId.is_valid(data.tenant_id):
-            raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+            raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
         tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
         if not tenant:
@@ -353,6 +393,19 @@ async def add_store(
 
         if any(store.store_id == data.store_id for store in location.stores):
             raise HTTPException(status_code=400, detail="Store already exists in this location")
+        # Validate essential string fields
+        if not data.store_id or not data.store_id.strip():
+            raise HTTPException(status_code=400, detail="Store ID is required and cannot be empty")
+
+        if not data.name or not data.name.strip():
+            raise HTTPException(status_code=400, detail="Store name is required and cannot be empty")
+
+        if not data.state or not data.state.strip():
+            raise HTTPException(status_code=400, detail="State is required and cannot be empty")
+
+        if not data.country or not data.country.strip():
+            raise HTTPException(status_code=400, detail="Country is required and cannot be empty")
+
 
         lat, lon = data.lat, data.lon
         if lat is None or lon is None:

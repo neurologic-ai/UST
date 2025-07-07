@@ -79,9 +79,11 @@ async def update_tenant(
         tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
-
+        updated = False
         # Only update provided fields
-        if data.tenant_name:
+        if data.tenant_name is not None:
+            if not data.tenant_name.strip():
+                raise HTTPException(status_code=400, detail="Tenant name cannot be empty or whitespace")
             normalized_name = data.tenant_name.strip().lower()
             # Check for duplicate
             existing = await db.find_one(
@@ -92,12 +94,19 @@ async def update_tenant(
                 raise HTTPException(status_code=400, detail="Another tenant with this name already exists")
             tenant.tenant_name = data.tenant_name
             tenant.normalized_name = normalized_name
+            updated = True
 
         if data.api_key:
+            if not data.api_key.strip():
+                raise HTTPException(status_code=400, detail="API key cannot be an empty string")
             tenant.api_key = data.api_key
+            updated = True
 
         if data.status is not None:
             tenant.status = data.status
+            updated = True
+        if not updated:
+            raise HTTPException(status_code=400, detail="No fields provided to update")
 
         tenant.updated_at = datetime.utcnow()
         tenant.updated_by = str(authorize.id)

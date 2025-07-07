@@ -99,8 +99,15 @@ async def create_user(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        if not user.username.strip():
+            raise HTTPException(status_code=400, detail="Username cannot be empty")
+
+        if not user.password.strip():
+            raise HTTPException(status_code=400, detail="Password cannot be empty")
+
         if not re.fullmatch(r"[A-Za-z ]+", user.name):
             raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
+        tenant_id = user.tenant_id.strip() if user.tenant_id and user.tenant_id.strip() else None
 
         # Check if username already exists (optional but safe)
         existing_user = await db.find_one(User, User.username == user.username)
@@ -117,7 +124,7 @@ async def create_user(
             permissions=['items:read', 'items:write', 'users:read', 'users:write'],
             role=user.role,
             name=user.name,
-            tenant_id=user.tenant_id,
+            tenant_id=tenant_id,
             created_at=datetime.datetime.utcnow(),
             created_by=str(authorize.id)
         )
@@ -157,6 +164,7 @@ async def edit_user(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        logger.debug(user_update.password)
         if not user_update.username:
             raise HTTPException(status_code=400, detail="Username is required")
 
@@ -164,19 +172,22 @@ async def edit_user(
 
         if not existing_user:
             raise HTTPException(status_code=404, detail="User not found")
-        if not re.fullmatch(r"[A-Za-z ]+", user_update.name):
-            raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
-
-
+        
         # Update fields if provided
-        if user_update.password:
+        if user_update.password is not None:
+            if not user_update.password.strip():
+                raise HTTPException(status_code=400, detail="Password cannot be empty")
             existing_user.password = bcrypt.hashpw(user_update.password.encode(), bcrypt.gensalt()).decode()
+
         if user_update.role is not None:
             existing_user.role = user_update.role
         if user_update.name is not None:
+            if not re.fullmatch(r"[A-Za-z ]+", user_update.name):
+                raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
             existing_user.name = user_update.name
         if user_update.tenant_id is not None:
-            existing_user.tenant_id = user_update.tenant_id
+            tenant_id = user_update.tenant_id.strip() if user_update.tenant_id and user_update.tenant_id.strip() else None
+            existing_user.tenant_id = tenant_id
         if user_update.status is not None:
             existing_user.status = user_update.status
 
@@ -201,7 +212,7 @@ async def disable_user(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not username:
+        if not username.strip():
             raise HTTPException(status_code=400, detail="Username is required")
 
         user = await db.find_one(User, User.username == username)

@@ -16,9 +16,12 @@ async def get_weather_forecast(lat, lon):
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(url, params=params)
-            response.raise_for_status()
             logger.debug(f"Weather API status: {response.status_code}")
+            if response.status_code != 200:
+                logger.error(f"Non-200 response from Weather API: {response.text}")
+                return None
             return response.json()
+
     except httpx.RequestError as e:
         logger.error(f"Weather API request failed: {e}")
         return None

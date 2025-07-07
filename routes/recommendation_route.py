@@ -101,28 +101,9 @@ async def upload_csvs(
         processed.file.seek(0)  # reset before upload
         processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=unique_store_ids)
         # logger.debug(processed_url)
-
-        ###The below code is for local testing.
-        
-        
-        # CHUNK_SIZE = 1000000
-        # # List of required columns
-        # REQUIRED_COLUMNS = ['Session_id', 'Datetime', 'Product_name','UPC','Quantity','location_id','store_id']  
-
-        # # Step 1: Read both files into pandas DataFrames
-        # df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str, "location_id": str})
-        # all_tasks = [
-        #     process_chunk(df_processed, tenantId, locationId)
-        #     for df_processed in df_processed_chunks
-        # ]
-
-        # # # Run all chunk processes concurrently
-        # results = await asyncio.gather(*all_tasks)
-        # logger.debug("Data is stored successfully")
         
         return {
-            "message": "Sales data has been Uploaded",
-            
+            "message": "Sales data has been Uploaded"
         }
     except Exception as e:
         logger.debug(traceback.format_exc())
@@ -173,8 +154,6 @@ async def recommendation(
                 content={"message": "Lookup dictionaries not found for given tenant and location."}
             )
 
-        # categories_dct = await get_categories_from_cache_or_s3(tenant_id, data.locationId, db)
-
         final_top_n = data.topN
         top_n = final_top_n + 50
 
@@ -219,12 +198,6 @@ async def recommendation(
         assoc_data_dict, assoc_names = assoc_result
         all_required_names = set(popular_names + assoc_names + cart_items)
         categories_dct = await get_categories_for_products(list(all_required_names), tenant_id, data.locationId, db)
-
-        # aggregator = Aggregation(popular_names, cart_items, categories_dct, current_hr, weather)
-        # filtered_popular_names = aggregator.get_final_recommendations()
-
-        # aggregator = Aggregation(assoc_names, cart_items, categories_dct, current_hr, weather)
-        # filtered_assoc_names = aggregator.get_final_recommendations()
 
         # ✅ Define helper function locally
         async def run_aggregation(name_list, cart_items, categories, current_hr, weather):

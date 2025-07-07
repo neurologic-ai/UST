@@ -17,4 +17,12 @@ COPY . .
 EXPOSE 8000
 
 # Run the application.
-CMD ["gunicorn", "main:backend_app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+CMD [
+  "gunicorn", "main:backend_app",
+  "-k", "uvicorn.workers.UvicornWorker",
+  "--workers", "4",
+  "--worker-connections", "1000",
+  "--timeout", "90",
+  "--keep-alive", "5",
+  "--bind", "0.0.0.0:8000"
+]

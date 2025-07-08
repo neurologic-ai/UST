@@ -5,6 +5,7 @@ import traceback
 from typing import Any, List
 
 import bcrypt
+from bson import ObjectId
 import jwt
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, SecurityScopes
@@ -12,7 +13,7 @@ from fastapi.testclient import TestClient
 from loguru import logger
 from odmantic import AIOEngine
 from models.schema import LoginData, PyUser, Token, UserCreate, UserFilterRequest, UserUpdate
-from models.db import User, UserStatus
+from models.db import Tenant, User, UserStatus
 from db.singleton import get_engine
 from repos.user_repos import build_nested_and
 
@@ -107,12 +108,21 @@ async def create_user(
 
         if not re.fullmatch(r"[A-Za-z ]+", user.name):
             raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
-        tenant_id = user.tenant_id.strip() if user.tenant_id and user.tenant_id.strip() else None
 
         # Check if username already exists (optional but safe)
         existing_user = await db.find_one(User, User.username == user.username)
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already exists")
+        tenant_id = user.tenant_id.strip() if user.tenant_id and user.tenant_id.strip() else None
+
+        if tenant_id:
+            if not ObjectId.is_valid(tenant_id):
+                raise HTTPException(status_code=400, detail="Invalid tenant ID")
+
+            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
+            if not tenant:
+                raise HTTPException(status_code=400, detail="Tenant not found")
+
 
         # Hash the password and convert bytes to str
         hashed_password = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
@@ -185,9 +195,20 @@ async def edit_user(
             if not re.fullmatch(r"[A-Za-z ]+", user_update.name):
                 raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
             existing_user.name = user_update.name
-        if user_update.tenant_id is not None:
-            tenant_id = user_update.tenant_id.strip() if user_update.tenant_id and user_update.tenant_id.strip() else None
-            existing_user.tenant_id = tenant_id
+        if user_update.tenant_id is not None:  # This handles null from JSON
+            tenant_id = user_update.tenant_id.strip()
+            if tenant_id:  # Handles empty strings like "" or "   "
+                if not ObjectId.is_valid(tenant_id):
+                    raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+
+                tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
+                if not tenant:
+                    raise HTTPException(status_code=400, detail="Tenant not found")
+
+                existing_user.tenant_id = tenant_id
+            else:
+                existing_user.tenant_id = None
+
         if user_update.status is not None:
             existing_user.status = user_update.status
 

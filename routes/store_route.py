@@ -206,20 +206,20 @@ async def edit_store(
             store.country = data.country.strip()
             updated = True
 
-        # if data.lat is None or data.lon is None:
-        #     async with httpx.AsyncClient() as client:
-        #         lat, lon = await get_lat_lon(store.name, store.state, store.country, client)
-        #         store.lat = lat
-        #         store.lon = lon
-        #     updated = True
-        # else:
-        #     store.lat = data.lat
-        #     store.lon = data.lon
-        #     updated = True
+        if data.lat is None or data.lon is None:
+            async with httpx.AsyncClient() as client:
+                lat, lon = await get_lat_lon(store.name, store.state, store.country, client)
+                store.lat = lat
+                store.lon = lon
+            updated = True
+        else:
+            store.lat = data.lat
+            store.lon = data.lon
+            updated = True
 
-        # if data.status is not None:
-        #     store.status = data.status
-        #     updated = True
+        if data.status is not None:
+            store.status = data.status
+            updated = True
 
         if not updated:
             raise HTTPException(status_code=400, detail="No fields provided to update")

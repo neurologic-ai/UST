@@ -208,7 +208,7 @@ async def edit_store(
 
         if data.lat is None or data.lon is None:
             async with httpx.AsyncClient() as client:
-                lat, lon = await get_lat_lon(store.name, store.state, store.country, client)
+                lat, lon = await get_lat_lon(location.name, store.state, store.country, client)
                 store.lat = lat
                 store.lon = lon
             updated = True

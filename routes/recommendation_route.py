@@ -3,7 +3,7 @@ from datetime import datetime
 import time
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from odmantic import AIOEngine
+from odmantic import AIOEngine, ObjectId
 import redis.asyncio as redis
 from auth.api_key import get_current_tenant
 from db.redis_client import get_redis_client
@@ -78,38 +78,73 @@ async def upload_csvs(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        logger.debug("api call started")
+        logger.debug("API call started")
+
+        if not ObjectId.is_valid(tenantId):
+            raise HTTPException(status_code=400, detail="Invalid tenant ID")
+
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenantId))
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+
+        location = next((loc for loc in tenant.locations if loc.location_id == locationId), None)
+        if not location:
+            raise HTTPException(status_code=404, detail=f"Location '{locationId}' not found for this tenant")
+        
         REQUIRED_COLUMNS = ['Session_id', 'Datetime', 'Product_name','UPC','Quantity','location_id','store_id']  
-        # 🔹 Call the validation function
         await validate_csv_columns(processed, REQUIRED_COLUMNS)
         processed.file.seek(0)
 
-        # Step 2: Measure time to extract unique store_ids
-        logger.debug("Extracting unique store_ids started...")
+        logger.debug("Extracting store_ids and location_ids from CSV...")
         start_time = time.perf_counter()
-        store_ids = set()
-        for chunk in pd.read_csv(processed.file, usecols=["store_id"], chunksize=100_000, dtype={"store_id": str}):
-            store_ids.update(chunk["store_id"].dropna())
 
-        unique_store_ids = list(store_ids)
-        end_time = time.perf_counter()
-        logger.debug(f"Extracted {len(unique_store_ids)} unique store_ids in {end_time - start_time:.2f} seconds")
+        store_ids_in_location = {store.store_id for store in location.stores}
+        uploaded_store_ids = set()
+        uploaded_location_ids = set()
 
-        # # Step 3: Delete only data for the extracted store_ids
-        # await delete_documents_for_tenant_location_and_store_ids(tenantId, locationId, unique_store_ids)
+        for chunk in pd.read_csv(
+            processed.file,
+            usecols=["store_id", "location_id"],
+            chunksize=100_000,
+            dtype={"store_id": str, "location_id": str}
+        ):
+            uploaded_store_ids.update(chunk["store_id"].dropna().unique().tolist())
+            uploaded_location_ids.update(chunk["location_id"].dropna().unique().tolist())
 
-        processed.file.seek(0)  # reset before upload
-        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=unique_store_ids)
-        # logger.debug(processed_url)
+        invalid_store_ids = [sid for sid in uploaded_store_ids if sid not in store_ids_in_location]
+
+        invalid_location_ids = uploaded_location_ids - {locationId}  
+
+        error_messages = []
         
+        if invalid_location_ids:
+            error_messages.append(f"Invalid location_id(s): {', '.join(invalid_location_ids)}. Expected only: {locationId}")
+        if invalid_store_ids:
+            error_messages.append(f"Invalid store_id(s): {', '.join(invalid_store_ids)}")
+
+        if error_messages:
+            raise HTTPException(
+                status_code=400,
+                detail="; ".join(error_messages)
+            )
+
+
+        end_time = time.perf_counter()
+        logger.debug(f"Validated store_ids and location_id in {end_time - start_time:.2f} seconds")
+
+        processed.file.seek(0)  # Reset before upload
+        # processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=uploaded_store_ids)
+
         return {
-            "message": "Sales data has been Uploaded"
+            "message": "Sales data has been uploaded successfully",
+            "uploaded_store_count": len(uploaded_store_ids)
         }
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.debug(traceback.format_exc())
-        raise
-
-
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/recommendation")
@@ -128,6 +163,8 @@ async def recommendation(
         logger.debug(current_datetime)
         logger.debug(current_hr)
         logger.debug(tenant_id)
+        if not (0 <= data.currentHour <= 23):
+            raise HTTPException(status_code=400, detail="currentHour must be between 0 and 23")
 
         # Validate location
         location = next((loc for loc in tenant.locations if loc.location_id == data.locationId), None)

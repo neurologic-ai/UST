@@ -106,6 +106,9 @@ async def create_user(
         if not user.password.strip():
             raise HTTPException(status_code=400, detail="Password cannot be empty")
 
+        if len(user.password.strip()) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+
         if not re.fullmatch(r"[A-Za-z ]+", user.name):
             raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
 
@@ -187,6 +190,10 @@ async def edit_user(
         if user_update.password is not None:
             if not user_update.password.strip():
                 raise HTTPException(status_code=400, detail="Password cannot be empty")
+
+            if len(user_update.password.strip()) < 6:
+                raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+
             existing_user.password = bcrypt.hashpw(user_update.password.encode(), bcrypt.gensalt()).decode()
 
         if user_update.role is not None:
@@ -199,7 +206,7 @@ async def edit_user(
             tenant_id = user_update.tenant_id.strip()
             if tenant_id:  # Handles empty strings like "" or "   "
                 if not ObjectId.is_valid(tenant_id):
-                    raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+                    raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
                 tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
                 if not tenant:
@@ -264,10 +271,15 @@ async def list_users(
     authorize: User = Depends(PermissionChecker(["users:read"])),
     db: AIOEngine = Depends(get_engine)
 ):
-    try:
+    try:    
         query_parts = []
 
         if filters.tenant_id:
+            if not ObjectId.is_valid(filters.tenant_id):
+                raise HTTPException(status_code=400, detail="Invalid tenant ID")
+            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenant_id))
+            if not tenant:
+                raise HTTPException(status_code=404, detail="Tenant not found")
             query_parts.append(User.tenant_id == filters.tenant_id)
         if filters.status:
             query_parts.append(User.status == filters.status)
@@ -275,12 +287,15 @@ async def list_users(
             query_parts.append(User.role == filters.role)
         if filters.name:
             query_parts.append(User.name == filters.name)
+        if filters.username:
+            query_parts.append(User.username == filters.username)
 
         final_query = build_nested_and(query_parts)
         users = await db.find(User, final_query)
 
         return users
-
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.debug(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

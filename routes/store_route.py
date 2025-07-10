@@ -1,3 +1,4 @@
+import asyncio
 import csv
 from datetime import datetime
 from io import StringIO
@@ -20,16 +21,27 @@ from configs.manager import settings
 
 router = APIRouter(prefix="/api/v2", tags=['store'])
 
+required_fields = ["Store ID", "Store Name", "Location Id", "Location"]
 
 def validate_store_row(row: dict) -> bool:
-    required_fields = ["Store ID", "Store Name", "Location Id", "Location"]
     return all(row.get(field) for field in required_fields)
 
 
 async def parse_csv_file(file: UploadFile) -> List[dict]:
     try:
         content = await file.read()
-        return list(csv.DictReader(StringIO(content.decode())))
+        decoded = content.decode()
+        reader = csv.DictReader(StringIO(decoded))
+
+        # ✅ Check if required headers are present
+        missing = [col for col in required_fields if col not in reader.fieldnames]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"CSV is missing required columns: {', '.join(missing)}"
+            )
+
+        return list(reader)
     except Exception as e:
         logger.error(f"Failed to parse CSV file: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid CSV format: {str(e)}")
@@ -41,6 +53,7 @@ async def get_lat_lon(location: str, state: str, country: str, client: httpx.Asy
     queries = [
         build_query([location, state, country]),
         build_query([state, country]),
+        build_query([country]),
     ]
 
     for q in queries:
@@ -51,36 +64,37 @@ async def get_lat_lon(location: str, state: str, country: str, client: httpx.Asy
 
             if response.status_code != 200:
                 logger.warning(f"[Geocode] Non-200 status: {response.status_code}, body: {response.text}")
+                await asyncio.sleep(1)
                 continue
 
             try:
                 results = response.json()
-                # logger.debug(f"[Geocode] Response: {results}")
             except Exception as parse_error:
                 logger.error(f"[Geocode] JSON parse error: {parse_error} | Raw: {response.text}")
+                await asyncio.sleep(1)
                 continue
 
             if results and isinstance(results, list) and results[0]:
-                try:
-                    lat_raw = results[0].get("lat")
-                    lon_raw = results[0].get("lon")
+                logger.debug(results)
+                lat_raw = results[0].get("lat")
+                lon_raw = results[0].get("lon")
 
-                    if lat_raw is not None and lon_raw is not None:
-                        lat = float(lat_raw)
-                        lon = float(lon_raw)
-                        logger.debug(f"[Geocode] Success: lat={lat}, lon={lon} for query '{q}'")
-                        return lat, lon
-                    else:
-                        logger.warning(f"[Geocode] lat/lon missing in result: {results[0]}")
-                except (ValueError, TypeError) as parse_error:
-                    logger.warning(f"[Geocode] Failed to convert lat/lon: {parse_error} | Raw: {results[0]}")
+                if lat_raw is not None and lon_raw is not None:
+                    lat = float(lat_raw)
+                    lon = float(lon_raw)
+                    logger.debug(f"[Geocode] Success: lat={lat}, lon={lon} for query '{q}'")
+                    return lat, lon
+                else:
+                    logger.warning(f"[Geocode] lat/lon missing in result: {results[0]}")
         except Exception as e:
             logger.warning(f"[Geocode] Exception for query '{q}': {e}")
 
+        # Wait before trying the next query
+        logger.debug(f"[Geocode] Waiting 1 second before next query...")
+        await asyncio.sleep(1)
+
     logger.warning(f"[Geocode] All attempts failed for location='{location}', state='{state}', country='{country}'")
     return None, None
-
-
 
 async def process_row(row: dict, tenant: Tenant, client: httpx.AsyncClient) -> bool:
     try:
@@ -142,7 +156,12 @@ async def upload_stores_from_csv(
             raise HTTPException(status_code=404, detail="Tenant not found")
 
         csv_rows = await parse_csv_file(file)
-
+        invalid_rows = [row for row in csv_rows if not validate_store_row(row)]
+        if invalid_rows:
+            raise HTTPException(
+                status_code=400,
+                detail=f"CSV contains {len(invalid_rows)} row(s) with missing required fields: {', '.join(['Store ID', 'Store Name', 'Location Id', 'Location'])}"
+            )
         updated = False
         async with httpx.AsyncClient() as client:
             for row in csv_rows:

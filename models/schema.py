@@ -108,6 +108,7 @@ class UserFilterRequest(BaseModel):
     status: Optional[UserStatus] = None
     role: Optional[UserRole] = None
     name: Optional[str] = None
+    username: Optional[str] = None
 
 class TenantFilterRequest(BaseModel):
     tenant_name: Optional[str] = None  # Optional filter

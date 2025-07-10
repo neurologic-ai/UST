@@ -133,7 +133,7 @@ async def upload_csvs(
         logger.debug(f"Validated store_ids and location_id in {end_time - start_time:.2f} seconds")
 
         processed.file.seek(0)  # Reset before upload
-        # processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=uploaded_store_ids)
+        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=uploaded_store_ids)
 
         return {
             "message": "Sales data has been uploaded successfully",

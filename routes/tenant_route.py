@@ -8,8 +8,9 @@ from bson.regex import Regex
 from typing import List
 import traceback
 
+from auth.tenant_user_verify import check_user_role_and_status
 from db.singleton import get_engine
-from models.db import Location, Store, Tenant, User, UserStatus
+from models.db import Location, Store, Tenant, User, UserRole, UserStatus
 from models.schema import TenantCreate, TenantFilterRequest, TenantUpdate
 from routes.user_route import PermissionChecker
 
@@ -28,6 +29,11 @@ async def create_tenant(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        if authorize.role == UserRole.TENANT_ADMIN:
+            raise HTTPException(
+                status_code=401,
+                detail="Tenant admin can not do this Activity"
+            )
         if not data.tenantName:
             raise HTTPException(status_code=400, detail="Tenant name is required")
 
@@ -73,18 +79,20 @@ async def update_tenant(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not data.tenant_id or not ObjectId.is_valid(data.tenant_id):
+        if not data.tenantId or not ObjectId.is_valid(data.tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
+        check_user_role_and_status(authorize, data.tenantId)
+
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
         updated = False
         # Only update provided fields
-        if data.tenant_name is not None:
-            if not data.tenant_name.strip():
+        if data.tenantName is not None:
+            if not data.tenantName.strip():
                 raise HTTPException(status_code=400, detail="Tenant name cannot be empty or whitespace")
-            normalized_name = data.tenant_name.strip().lower()
+            normalized_name = data.tenantName.strip().lower()
             # Check for duplicate
             existing = await db.find_one(
                 Tenant,
@@ -92,14 +100,14 @@ async def update_tenant(
             )
             if existing:
                 raise HTTPException(status_code=400, detail="Another tenant with this name already exists")
-            tenant.tenant_name = data.tenant_name
+            tenant.tenant_name = data.tenantName
             tenant.normalized_name = normalized_name
             updated = True
 
-        if data.api_key:
-            if not data.api_key.strip():
+        if data.apiKey:
+            if not data.apiKey.strip():
                 raise HTTPException(status_code=400, detail="API key cannot be an empty string")
-            tenant.api_key = data.api_key
+            tenant.api_key = data.apiKey
             updated = True
 
         if data.status is not None:
@@ -124,15 +132,20 @@ async def update_tenant(
 
 @router.put("/tenant/disable")
 async def disable_tenant(
-    tenant_id: str,
+    tenantId: str,
     authorize: User = Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not tenant_id or not ObjectId.is_valid(tenant_id):
+        if authorize.role == UserRole.TENANT_ADMIN:
+            raise HTTPException(
+                status_code=401,
+                detail="Tenant admin can not do this Activity"
+            )
+        if not tenantId or not ObjectId.is_valid(tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
 
@@ -183,16 +196,22 @@ async def list_tenants(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        if authorize.role == UserRole.TENANT_ADMIN:
+            raise HTTPException(
+                status_code=401,
+                detail="Tenant admin can not do this Activity"
+            )
         query_filter = {}
 
-        if filters.tenant_name:
-            query_filter["tenant_name"] = Regex(f".*{filters.tenant_name}.*", "i")
+        if filters.tenantName:
+            query_filter["tenantName"] = Regex(f".*{filters.tenantName}.*", "i")
         if filters.status:
             query_filter["status"] = filters.status
 
         tenants = [t async for t in db.find(Tenant, query_filter)]
         return tenants
-
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.debug(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
@@ -200,15 +219,17 @@ async def list_tenants(
 
 @router.post("/tenant/regenerate-api-key")
 async def regenerate_api_key(
-    tenant_id: str,
+    tenantId: str,
     authorize: User = Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not tenant_id or not ObjectId.is_valid(tenant_id):
+        if not tenantId or not ObjectId.is_valid(tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
+        check_user_role_and_status(authorize, tenantId)
+
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
 

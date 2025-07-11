@@ -3,7 +3,7 @@ from operator import and_
 import re
 import traceback
 from typing import Any, List
-
+from bson.regex import Regex
 import bcrypt
 from bson import ObjectId
 import jwt
@@ -12,7 +12,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, Se
 from fastapi.testclient import TestClient
 from loguru import logger
 from odmantic import AIOEngine
-from models.schema import LoginData, PyUser, Token, UserCreate, UserFilterRequest, UserUpdate
+from models.schema import LoginData, PyUser, Token, UserCreate, UserFilterRequest, UserResponse, UserUpdate
 from models.db import Tenant, User, UserStatus
 from db.singleton import get_engine
 from repos.user_repos import build_nested_and
@@ -116,7 +116,7 @@ async def create_user(
         existing_user = await db.find_one(User, User.username == user.username)
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already exists")
-        tenant_id = user.tenant_id.strip() if user.tenant_id and user.tenant_id.strip() else None
+        tenant_id = user.tenantId.strip() if user.tenantId and user.tenantId.strip() else None
 
         if tenant_id:
             if not ObjectId.is_valid(tenant_id):
@@ -202,8 +202,8 @@ async def edit_user(
             if not re.fullmatch(r"[A-Za-z ]+", user_update.name):
                 raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
             existing_user.name = user_update.name
-        if user_update.tenant_id is not None:  # This handles null from JSON
-            tenant_id = user_update.tenant_id.strip()
+        if user_update.tenantId is not None:  # This handles null from JSON
+            tenant_id = user_update.tenantId.strip()
             if tenant_id:  # Handles empty strings like "" or "   "
                 if not ObjectId.is_valid(tenant_id):
                     raise HTTPException(status_code=400, detail="Invalid tenant ID")
@@ -265,7 +265,7 @@ async def disable_user(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/users/list", response_model=List[User])
+@router.post("/users/list", response_model=List[UserResponse])
 async def list_users(
     filters: UserFilterRequest,
     authorize: User = Depends(PermissionChecker(["users:read"])),
@@ -274,26 +274,29 @@ async def list_users(
     try:    
         query_parts = []
 
-        if filters.tenant_id:
-            if not ObjectId.is_valid(filters.tenant_id):
+        if filters.tenantId:
+            if not ObjectId.is_valid(filters.tenantId):
                 raise HTTPException(status_code=400, detail="Invalid tenant ID")
-            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenant_id))
+            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenantId))
             if not tenant:
                 raise HTTPException(status_code=404, detail="Tenant not found")
-            query_parts.append(User.tenant_id == filters.tenant_id)
+            query_parts.append(User.tenant_id == filters.tenantId)
         if filters.status:
             query_parts.append(User.status == filters.status)
         if filters.role:
             query_parts.append(User.role == filters.role)
+
         if filters.name:
-            query_parts.append(User.name == filters.name)
+            query_parts.append({"name": Regex(f".*{filters.name}.*", "i")})
+
         if filters.username:
-            query_parts.append(User.username == filters.username)
+            query_parts.append({"username": Regex(f".*{filters.username}.*", "i")})
 
         final_query = build_nested_and(query_parts)
         users = await db.find(User, final_query)
 
-        return users
+        return [UserResponse(**user.dict(exclude={'password', 'permissions'})) for user in users]
+
     except HTTPException as e:
         raise e
     except Exception as e:

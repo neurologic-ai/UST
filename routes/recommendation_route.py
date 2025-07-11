@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from odmantic import AIOEngine, ObjectId
 import redis.asyncio as redis
 from auth.api_key import get_current_tenant
+from auth.tenant_user_verify import check_user_role_and_status
 from db.redis_client import get_redis_client
 from models.schema import RecommendationRequestBody
 from models.hepler import Product, Aggregation
@@ -82,6 +83,8 @@ async def upload_csvs(
 
         if not ObjectId.is_valid(tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
+        
+        check_user_role_and_status(authorize, tenantId)
 
         tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenantId))
         if not tenant:
@@ -137,7 +140,7 @@ async def upload_csvs(
 
         return {
             "message": "Sales data has been uploaded successfully",
-            "uploaded_store_count": len(uploaded_store_ids)
+            "storeCSount": len(uploaded_store_ids)
         }
 
     except HTTPException:

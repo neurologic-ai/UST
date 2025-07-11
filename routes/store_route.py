@@ -10,8 +10,9 @@ from bson import ObjectId
 from typing import List, Optional, Tuple
 import httpx
 
+from auth.tenant_user_verify import check_user_role_and_status
 from db.singleton import get_engine
-from models.db import Location, Store, Tenant, User, UserStatus
+from models.db import Location, Store, Tenant, User, UserRole, UserStatus
 from models.schema import (
     AddLocationRequest, AddStoreRequest, LocationFilterRequest,
     StoreDisableRequest, StoreEditRequest, StoreFilterRequest
@@ -142,16 +143,18 @@ async def process_row(row: dict, tenant: Tenant, client: httpx.AsyncClient) -> b
 
 @router.post("/tenant/stores/upload")
 async def upload_stores_from_csv(
-    tenant_id: str,
+    tenantId: str,
     file: UploadFile = File(...),
     authorize: User = Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not ObjectId.is_valid(tenant_id):
+        if not ObjectId.is_valid(tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
+        
+        check_user_role_and_status(authorize, tenantId)
 
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
 
@@ -188,20 +191,22 @@ async def edit_store(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not ObjectId.is_valid(data.tenant_id):
+        if not ObjectId.is_valid(data.tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
+        
+        check_user_role_and_status(authorize, data.tenantId)
 
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
 
         # Locate the correct location
-        location = next((loc for loc in tenant.locations if loc.location_id == data.location_id), None)
+        location = next((loc for loc in tenant.locations if loc.location_id == data.locationId), None)
         if not location:
             raise HTTPException(status_code=404, detail="Location not found")
 
         # Locate the correct store
-        store = next((s for s in location.stores if s.store_id == data.store_id), None)
+        store = next((s for s in location.stores if s.store_id == data.storeId), None)
         if not store:
             raise HTTPException(status_code=404, detail="Store not found")
 
@@ -257,16 +262,19 @@ async def edit_store(
 @router.put("/tenant/store/disable")
 async def disable_store(data: StoreDisableRequest, authorize: User = Depends(PermissionChecker(['items:write'])), db: AIOEngine = Depends(get_engine)):
     try:
-        if not ObjectId.is_valid(data.tenant_id):
+        if not ObjectId.is_valid(data.tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
+        
+        check_user_role_and_status(authorize, data.tenantId)
+
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
-
+        
         for loc in tenant.locations:
-            if loc.location_id == data.location_id:
+            if loc.location_id == data.locationId:
                 for store in loc.stores:
-                    if store.store_id == data.store_id:
+                    if store.store_id == data.storeId:
                         if store.status == UserStatus.INACTIVE:
                             return {"message": "Store is already inactive"}
                         store.status = UserStatus.INACTIVE
@@ -291,19 +299,20 @@ async def list_stores(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not ObjectId.is_valid(filters.tenant_id):
+        if not ObjectId.is_valid(filters.tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
+        check_user_role_and_status(authorize, filters.tenantId)
 
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenant_id))
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
 
         matched_stores = []
         for loc in tenant.locations:
-            if filters.location_id and loc.location_id != filters.location_id:
+            if filters.locationId and loc.location_id != filters.locationId:
                 continue
             for store in loc.stores:
-                if filters.store_id and store.store_id != filters.store_id:
+                if filters.storeId and store.store_id != filters.storeId:
                     continue
                 if filters.status and store.status != filters.status:
                     continue
@@ -328,16 +337,16 @@ async def list_locations(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not ObjectId.is_valid(filters.tenant_id):
+        if not ObjectId.is_valid(filters.tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
-
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenant_id))
+        check_user_role_and_status(authorize, filters.tenantId)
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
-
+        
         matched_locations = []
         for loc in tenant.locations:
-            if filters.location_id and loc.location_id != filters.location_id:
+            if filters.locationId and loc.location_id != filters.locationId:
                 continue
             if filters.status and loc.status != filters.status:
                 continue
@@ -359,24 +368,25 @@ async def add_location(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not ObjectId.is_valid(data.tenant_id):
+        if not ObjectId.is_valid(data.tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
+        check_user_role_and_status(authorize, data.tenantId)
+
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
-
-        if any(loc.location_id == data.location_id for loc in tenant.locations):
-            raise HTTPException(status_code=400, detail="Location already exists")
-        if not data.location_id or not data.location_id.strip():
+        if not data.locationId or not data.locationId.strip():
             raise HTTPException(status_code=400, detail="Location ID is required and cannot be empty")
 
         if not data.name or not data.name.strip():
             raise HTTPException(status_code=400, detail="Location name is required and cannot be empty")
 
+        if any(loc.location_id == data.locationId for loc in tenant.locations):
+            raise HTTPException(status_code=400, detail="Location already exists")
 
         tenant.locations.append(Location(
-            location_id=data.location_id,
+            location_id=data.locationId,
             name=data.name,
             status=data.status,
             stores=[]
@@ -399,23 +409,28 @@ async def add_store(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if not ObjectId.is_valid(data.tenant_id):
+        if not ObjectId.is_valid(data.tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
-        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenant_id))
+        check_user_role_and_status(authorize, data.tenantId)
+
+        tenant = await db.find_one(Tenant, Tenant.id == ObjectId(data.tenantId))
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
 
-        location = next((loc for loc in tenant.locations if loc.location_id == data.location_id), None)
+        if not data.storeId or not data.storeId.strip():
+            raise HTTPException(status_code=400, detail="Store ID is required and cannot be empty")
+        if not data.locationId or not data.locationId.strip():
+            raise HTTPException(status_code=400, detail="Location ID is required and cannot be empty")
+
+
+        location = next((loc for loc in tenant.locations if loc.location_id == data.locationId), None)
         if not location:
             raise HTTPException(status_code=404, detail="Location not found")
 
-        if any(store.store_id == data.store_id for store in location.stores):
+        if any(store.store_id == data.storeId for store in location.stores):
             raise HTTPException(status_code=400, detail="Store already exists in this location")
         # Validate essential string fields
-        if not data.store_id or not data.store_id.strip():
-            raise HTTPException(status_code=400, detail="Store ID is required and cannot be empty")
-
         if not data.name or not data.name.strip():
             raise HTTPException(status_code=400, detail="Store name is required and cannot be empty")
 
@@ -435,7 +450,7 @@ async def add_store(
             logger.debug(f"[Geocode] Result: lat={lat}, lon={lon}")
 
         location.stores.append(Store(
-            store_id=data.store_id,
+            store_id=data.storeId,
             name=data.name,
             status=data.status,
             state=data.state,

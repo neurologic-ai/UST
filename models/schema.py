@@ -29,7 +29,7 @@ class UserCreate(UserBase):
     password: str
     role: UserRole
     name: str
-    tenant_id: Optional[str] = None
+    tenantId: Optional[str] = None
 
 class PyUser(UserBase):
     id: Any
@@ -88,9 +88,9 @@ class TenantCreate(BaseModel):
     
 
 class TenantUpdate(BaseModel):
-    tenant_id: str
-    tenant_name: Optional[str] = None
-    api_key: Optional[str] = None
+    tenantId: str
+    tenantName: Optional[str] = None
+    apiKey: Optional[str] = None
     status: Optional[UserStatus] = None
 
 
@@ -99,26 +99,26 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[UserRole] = None
     name: Optional[str] = None
-    tenant_id: Optional[str] = None
+    tenantId: Optional[str] = None
     status: Optional[UserStatus] = None
 
 
 class UserFilterRequest(BaseModel):
-    tenant_id: Optional[str] = None
+    tenantId: Optional[str] = None
     status: Optional[UserStatus] = None
     role: Optional[UserRole] = None
     name: Optional[str] = None
     username: Optional[str] = None
 
 class TenantFilterRequest(BaseModel):
-    tenant_name: Optional[str] = None  # Optional filter
+    tenantName: Optional[str] = None  # Optional filter
     status: Optional[UserStatus] = None  # Optional filter
 
 
 class StoreEditRequest(BaseModel):
-    tenant_id: str
-    location_id: str
-    store_id: str
+    tenantId: str
+    locationId: str
+    storeId: str
     name: Optional[str] = None
     state: Optional[str] = None
     country: Optional[str] = None
@@ -127,38 +127,53 @@ class StoreEditRequest(BaseModel):
     status: Optional[UserStatus] = None
 
 class StoreDisableRequest(BaseModel):
-    tenant_id: str
-    location_id: str
-    store_id: str
+    tenantId: str
+    locationId: str
+    storeId: str
 
 
 class StoreFilterRequest(BaseModel):
-    tenant_id: str
-    location_id: Optional[str] = None
-    store_id: Optional[str] = None
+    tenantId: str
+    locationId: Optional[str] = None
+    storeId: Optional[str] = None
     status: Optional[UserStatus] = None
 
 
 class LocationFilterRequest(BaseModel):
-    tenant_id: str
-    location_id: Optional[str] = None
+    tenantId: str
+    locationId: Optional[str] = None
     status: Optional[UserStatus] = None
 
 
 class AddLocationRequest(BaseModel):
-    tenant_id: str
-    location_id: str
+    tenantId: str
+    locationId: str
     name: str
     status: UserStatus = UserStatus.ACTIVE
 
 
 class AddStoreRequest(BaseModel):
-    tenant_id: str
-    location_id: str
-    store_id: str
+    tenantId: str
+    locationId: str
+    storeId: str
     name: str
     state: Optional[str] = None
     country: Optional[str] = None
     lat: Optional[float] = None
     lon: Optional[float] = None
     status: UserStatus = UserStatus.ACTIVE
+
+
+class UserResponse(BaseModel):
+    username: str
+    role: UserRole
+    name: str
+    status: UserStatus
+    tenant_id: Optional[str] = None
+    created_at: datetime
+    created_by: Optional[str] = None
+    updated_at: Optional[datetime] = None
+    updated_by: Optional[str] = None
+
+    class Config:
+        orm_mode = True

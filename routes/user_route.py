@@ -12,8 +12,9 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, Se
 from fastapi.testclient import TestClient
 from loguru import logger
 from odmantic import AIOEngine
+from auth.tenant_user_verify import check_user_role_and_status
 from models.schema import LoginData, PyUser, Token, UserCreate, UserFilterRequest, UserResponse, UserUpdate
-from models.db import Tenant, User, UserStatus
+from models.db import Tenant, User, UserRole, UserStatus
 from db.singleton import get_engine
 from repos.user_repos import build_nested_and
 
@@ -100,6 +101,20 @@ async def create_user(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        tenant_id = user.tenantId.strip() if user.tenantId and user.tenantId.strip() else None
+        if tenant_id:
+            if not ObjectId.is_valid(tenant_id):
+                raise HTTPException(status_code=400, detail="Invalid tenant ID")
+            check_user_role_and_status(authorize, tenant_id)
+            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
+            if not tenant:
+                raise HTTPException(status_code=400, detail="Tenant not found")
+        else:
+            if authorize.role == UserRole.TENANT_ADMIN:
+                raise HTTPException(
+                    status_code=401,
+                    detail="TenantId was not provided. Only UST_ADMIN can do this activity."
+                )
         if not user.username.strip():
             raise HTTPException(status_code=400, detail="Username cannot be empty")
 
@@ -121,7 +136,7 @@ async def create_user(
         if tenant_id:
             if not ObjectId.is_valid(tenant_id):
                 raise HTTPException(status_code=400, detail="Invalid tenant ID")
-
+            check_user_role_and_status(authorize, tenant_id)
             tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
             if not tenant:
                 raise HTTPException(status_code=400, detail="Tenant not found")
@@ -207,14 +222,12 @@ async def edit_user(
             if tenant_id:  # Handles empty strings like "" or "   "
                 if not ObjectId.is_valid(tenant_id):
                     raise HTTPException(status_code=400, detail="Invalid tenant ID")
-
+                check_user_role_and_status(authorize, tenant_id)
                 tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
                 if not tenant:
                     raise HTTPException(status_code=400, detail="Tenant not found")
 
                 existing_user.tenant_id = tenant_id
-            else:
-                existing_user.tenant_id = None
 
         if user_update.status is not None:
             existing_user.status = user_update.status

@@ -253,6 +253,11 @@ async def disable_user(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        if authorize.role == UserRole.TENANT_ADMIN:
+            raise HTTPException(
+                status_code=401,
+                detail="Tenant admin can not do this Activity"
+            )
         if not username.strip():
             raise HTTPException(status_code=400, detail="Username is required")
 
@@ -284,16 +289,26 @@ async def list_users(
     authorize: User = Depends(PermissionChecker(["users:read"])),
     db: AIOEngine = Depends(get_engine)
 ):
-    try:    
+    try:
         query_parts = []
-
-        if filters.tenantId:
-            if not ObjectId.is_valid(filters.tenantId):
+        if authorize.role == UserRole.ADMIN_UST:
+            if filters.tenantId:
+                if not ObjectId.is_valid(filters.tenantId):
+                    raise HTTPException(status_code=400, detail="Invalid tenant ID")
+                tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenantId))
+                if not tenant:
+                    raise HTTPException(status_code=404, detail="Tenant not found")
+                query_parts.append(User.tenant_id == filters.tenantId)
+        else:
+            tenant_id = authorize.tenant_id
+            logger.debug(tenant_id)
+            if not ObjectId.is_valid(tenant_id):
                 raise HTTPException(status_code=400, detail="Invalid tenant ID")
-            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(filters.tenantId))
+            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
             if not tenant:
                 raise HTTPException(status_code=404, detail="Tenant not found")
-            query_parts.append(User.tenant_id == filters.tenantId)
+            query_parts.append(User.tenant_id == tenant_id)
+        
         if filters.status:
             query_parts.append(User.status == filters.status)
         if filters.role:

@@ -5,7 +5,6 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 import os
 
-API_KEY = os.getenv("API_KEY")
 
 class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

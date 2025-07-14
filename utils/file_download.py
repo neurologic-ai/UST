@@ -61,14 +61,3 @@ def parse_s3_url(url):
         raise ValueError("URL is not a valid S3 URL.")
 
 
-
-# Example usage
-if __name__ == "__main__":
-    # s3_url = "https://s3-replus-prd-use-01.s3.amazonaws.com/101/101/2025-05-20_14-58-08/processed.csv"
-    # # s3_url = "https://s3-replus-prd-use-01.s3.amazonaws.com/2/10/2025-05-13_19-43-11/processed.csv?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIASHQJVI4CY6BH7G5Z%2F20250513%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20250513T141319Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=7693b1eb3d332a82a59e1e2e4475d32ccfd0b90563d97d010ceec720c12c6608"
-    # download_file_from_s3(s3_url)
-    s3_url = "https://s3-replus-prd-use-01.s3.amazonaws.com/682db0be29b7dee813deffc5/location_1/categories.csv"
-    local_file_path = "downloads/6th_june_50.csv"
-
-    download_file_from_s3(s3_url, local_file_path)
-

@@ -117,17 +117,57 @@ async def recommendation(
     filtered_assoc_recommendation = aggregator.get_final_recommendations()
 
     # if len(filtered_assoc_recommendation) == 0:
-    #     final_recommendation = {"message" : "Popular Recommendation", "recommendedItems": filtered_popular_recommendation[:final_top_n]}
+    #     final_recommendation = {
+    #         "message": "Popular Recommendation",
+    #         "recommendedItems": enrich_with_upc(filtered_popular_recommendation[:final_top_n], name_to_upc_map)
+    #     }
     # else:
-    #     final_recommendation = {"message" : "Association Recommendation", "recommendedItems": filtered_assoc_recommendation[:final_top_n]}
-    if len(filtered_assoc_recommendation) == 0:
-        final_recommendation = {
-            "message": "Popular Recommendation",
-            "recommendedItems": enrich_with_upc(filtered_popular_recommendation[:final_top_n], name_to_upc_map)
-        }
+    #     final_recommendation = {
+    #         "message": "Association Recommendation",
+    #         "recommendedItems": enrich_with_upc(filtered_assoc_recommendation[:final_top_n], name_to_upc_map)
+    #     }
+    base_recommendations = filtered_assoc_recommendation if filtered_assoc_recommendation else filtered_popular_recommendation
+
+    # === Load Fixed & Always from DB ===
+    fixed_products_cursor = await db.find(FixedProduct)
+    always_recommend_cursor = await db.find(AlwaysRecommendProduct)
+
+    fixed_products = list(fixed_products_cursor)
+    always_recommend = list(always_recommend_cursor)
+
+    # === Resolve name to UPC ===
+    base_recommendation_upcs = [name_to_upc_map.get(name.lower(), "") for name in base_recommendations]
+
+    fixed_upcs = set(fp.upc for fp in fixed_products)
+    always_upcs = set(ap.upc for ap in always_recommend)
+
+    # === Apply logic ===
+    final_list_upcs = []
+
+    if len(always_upcs) >= final_top_n:
+        final_list_upcs = list(always_upcs)[:final_top_n]
     else:
-        final_recommendation = {
-            "message": "Association Recommendation",
-            "recommendedItems": enrich_with_upc(filtered_assoc_recommendation[:final_top_n], name_to_upc_map)
-        }
-    return final_recommendation
+        final_list_upcs.extend(list(always_upcs))
+        slots_left = final_top_n - len(final_list_upcs)
+
+        matched_fixed = [upc for upc in base_recommendation_upcs if upc in fixed_upcs]
+        remaining_fixed = [fp.upc for fp in fixed_products if fp.upc not in matched_fixed]
+
+        while len(matched_fixed) < slots_left and remaining_fixed:
+            matched_fixed.append(remaining_fixed.pop())
+
+        final_list_upcs.extend(matched_fixed[:slots_left])
+        slots_left = final_top_n - len(final_list_upcs)
+
+        fallback_upcs = [upc for upc in base_recommendation_upcs if upc not in final_list_upcs]
+        final_list_upcs.extend(fallback_upcs[:slots_left])
+
+    final_list_upcs = list(dict.fromkeys(final_list_upcs))
+
+    # === Enrich UPC ➜ Name ===
+    final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_list_upcs[:final_top_n]]
+
+    return {
+        "message": "Final Recommendation",
+        "recommendedItems": final_result
+    }

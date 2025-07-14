@@ -31,3 +31,9 @@ venev
 
 # macOS
 .DS_Store
+.myvenv
+lambda_package_divider
+weather
+user.json
+locustfile.py
+test.py

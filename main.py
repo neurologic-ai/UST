@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from routes.recommendation_route import router as recommendation_router
 from routes.user_route import router as user_router
+from routes.fixed_alaways_reco import router as fixed_router
 from loguru import logger
 from fastapi.middleware.cors import CORSMiddleware
 import fastapi
@@ -27,6 +28,7 @@ def initialize_backend_application() -> fastapi.FastAPI:
     app.add_middleware(ExceptionHandlerMiddleware)
     app.include_router(recommendation_router)
     app.include_router(user_router)
+    app.include_router(fixed_router)
     return app
 
 

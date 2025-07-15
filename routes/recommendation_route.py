@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from odmantic import AIOEngine
 from auth.api_key import get_api_key
+from models.fixed_always_reco import RecommendationConfig
 from models.schema import RecommendationRequestBody
 from models.hepler import categories_dct, Aggregation, enrich_with_upc, get_product_names_from_upcs
 from db.singleton import get_engine
@@ -128,44 +129,42 @@ async def recommendation(
     #     }
     base_recommendations = filtered_assoc_recommendation if filtered_assoc_recommendation else filtered_popular_recommendation
 
-    # === Load Fixed & Always from DB ===
-    fixed_products_cursor = await db.find(FixedProduct)
-    always_recommend_cursor = await db.find(AlwaysRecommendProduct)
+    # === Load Config ===
+    config = await db.find_one(
+        RecommendationConfig
+    )
+    fixed_products = config.fixed_products if config else []
+    always_recommend = config.always_recommend if config else []
 
-    fixed_products = list(fixed_products_cursor)
-    always_recommend = list(always_recommend_cursor)
+    # === Cross-match ===
+    base_rec_upcs = [name_to_upc_map.get(name.lower(), "") for name in base_recommendations]
 
-    # === Resolve name to UPC ===
-    base_recommendation_upcs = [name_to_upc_map.get(name.lower(), "") for name in base_recommendations]
+    fixed_upcs = {fp["upc"] for fp in fixed_products}
+    always_upcs = {ap["upc"] for ap in always_recommend}
 
-    fixed_upcs = set(fp.upc for fp in fixed_products)
-    always_upcs = set(ap.upc for ap in always_recommend)
-
-    # === Apply logic ===
-    final_list_upcs = []
+    final_upcs = []
 
     if len(always_upcs) >= final_top_n:
-        final_list_upcs = list(always_upcs)[:final_top_n]
+        final_upcs = list(always_upcs)[:final_top_n]
     else:
-        final_list_upcs.extend(list(always_upcs))
-        slots_left = final_top_n - len(final_list_upcs)
+        final_upcs.extend(always_upcs)
+        slots_left = final_top_n - len(final_upcs)
 
-        matched_fixed = [upc for upc in base_recommendation_upcs if upc in fixed_upcs]
-        remaining_fixed = [fp.upc for fp in fixed_products if fp.upc not in matched_fixed]
+        matched_fixed = [upc for upc in base_rec_upcs if upc in fixed_upcs]
+        remaining_fixed = [fp["upc"] for fp in fixed_products if fp["upc"] not in matched_fixed]
 
         while len(matched_fixed) < slots_left and remaining_fixed:
             matched_fixed.append(remaining_fixed.pop())
 
-        final_list_upcs.extend(matched_fixed[:slots_left])
-        slots_left = final_top_n - len(final_list_upcs)
+        final_upcs.extend(matched_fixed[:slots_left])
+        slots_left = final_top_n - len(final_upcs)
 
-        fallback_upcs = [upc for upc in base_recommendation_upcs if upc not in final_list_upcs]
-        final_list_upcs.extend(fallback_upcs[:slots_left])
+        fallbacks = [upc for upc in base_rec_upcs if upc not in final_upcs]
+        final_upcs.extend(fallbacks[:slots_left])
 
-    final_list_upcs = list(dict.fromkeys(final_list_upcs))
+    final_upcs = list(dict.fromkeys(final_upcs))
 
-    # === Enrich UPC ➜ Name ===
-    final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_list_upcs[:final_top_n]]
+    final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs[:final_top_n]]
 
     return {
         "message": "Final Recommendation",

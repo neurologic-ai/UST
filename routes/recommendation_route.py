@@ -1,12 +1,13 @@
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException
-
+from loguru import logger
 from odmantic import AIOEngine
 from auth.api_key import get_api_key
-from models.fixed_always_reco import RecommendationConfig
+from models.fixed_always_reco import AlwaysRecommendProduct, FixedProduct
 from models.schema import RecommendationRequestBody
 from models.hepler import categories_dct, Aggregation, enrich_with_upc, get_product_names_from_upcs
 from db.singleton import get_engine
+from repos.fixed_always_product import merge_final_recommendations
 from routes.user_route import PermissionChecker
 from utils.helper import get_association_recommendations, get_popular_recommendation, load_lookup_dicts
 from configs.constant import PROCESSED_DATA_PATH, CATEGORY_DATA_PATH, TIME_SLOTS
@@ -128,45 +129,31 @@ async def recommendation(
     #         "recommendedItems": enrich_with_upc(filtered_assoc_recommendation[:final_top_n], name_to_upc_map)
     #     }
     base_recommendations = filtered_assoc_recommendation if filtered_assoc_recommendation else filtered_popular_recommendation
-
-    # === Load Config ===
-    config = await db.find_one(
-        RecommendationConfig
-    )
-    fixed_products = config.fixed_products if config else []
-    always_recommend = config.always_recommend if config else []
-
     # === Cross-match ===
     base_rec_upcs = [name_to_upc_map.get(name.lower(), "") for name in base_recommendations]
+    logger.debug(base_rec_upcs)
 
-    fixed_upcs = {fp["upc"] for fp in fixed_products}
-    always_upcs = {ap["upc"] for ap in always_recommend}
+    # === Load Fixed & Always ===
+    fixed_doc = await db.find_one(FixedProduct)
+    fixed_products = fixed_doc.products if fixed_doc else []
 
-    final_upcs = []
+    always_doc = await db.find_one(AlwaysRecommendProduct)
+    always_products = always_doc.products if always_doc else []
 
-    if len(always_upcs) >= final_top_n:
-        final_upcs = list(always_upcs)[:final_top_n]
-    else:
-        final_upcs.extend(always_upcs)
-        slots_left = final_top_n - len(final_upcs)
+    logger.debug(fixed_products)
+    logger.debug(always_products)
+    # Now extend the upc_to_name_map with the fixed and always products:
+    for fp in fixed_products:
+        upc_to_name_map[fp["UPC"]] = fp["Product Name"]
 
-        matched_fixed = [upc for upc in base_rec_upcs if upc in fixed_upcs]
-        remaining_fixed = [fp["upc"] for fp in fixed_products if fp["upc"] not in matched_fixed]
+    for ap in always_products:
+        upc_to_name_map[ap["UPC"]] = ap["Product Name"]
 
-        while len(matched_fixed) < slots_left and remaining_fixed:
-            matched_fixed.append(remaining_fixed.pop())
+    final_upcs = merge_final_recommendations(base_rec_upcs, fixed_products, always_products, final_top_n)
 
-        final_upcs.extend(matched_fixed[:slots_left])
-        slots_left = final_top_n - len(final_upcs)
-
-        fallbacks = [upc for upc in base_rec_upcs if upc not in final_upcs]
-        final_upcs.extend(fallbacks[:slots_left])
-
-    final_upcs = list(dict.fromkeys(final_upcs))
-
-    final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs[:final_top_n]]
+    final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs]
 
     return {
-        "message": "Final Recommendation",
+        "message": "✅ Final Recommendation",
         "recommendedItems": final_result
     }

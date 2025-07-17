@@ -69,26 +69,32 @@ async def upload_csvs(
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    # athorize:bool = Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
-    # if not athorize:
-    #     return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
-    ######################################
     final_top_n = data.topN
     top_n = final_top_n + 50
 
-    # cart_items = [item.strip().lower() for item in data.cartItems]
-    # cart_upcs = data.cartItems
+    # === Load Always upfront ===
+    always_doc = await db.find_one(AlwaysRecommendProduct) if data.use_always_recommend else None
+    always_products = always_doc.products if always_doc else []
+    always_upcs = {ap["UPC"] for ap in always_products}
+
+    # === If Always alone is enough ===
+    if data.use_always_recommend and len(always_upcs) >= final_top_n:
+        final_upcs = list(always_upcs)[:final_top_n]
+
+        upc_to_name_map = {ap["UPC"]: ap["Product Name"] for ap in always_products}
+
+        final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs]
+        return {
+            "message": "✅ Always Recommend used directly",
+            "recommendedItems": final_result
+        }
+
+
     name_to_upc_map, upc_to_name_map = load_lookup_dicts()
     cart_items = [upc_to_name_map.get(upc.strip(), "") for upc in data.cartItems]
-    # cart_items = get_product_names_from_upcs(cart_upcs)
     current_hr = data.currentHour
-    # current_dayofweek = data.current_dayofweek
-    # current_weather_category = data.current_weather_category
-    # current_holiday = data.current_holiday
-
-    ######################################
     timing_category = get_timing(current_hr, TIME_SLOTS)
     # Gather all recommendations concurrently
     if timing_category == 'Breakfast':
@@ -118,27 +124,17 @@ async def recommendation(
     aggregator = Aggregation(assoc_recommendations, cart_items, categories_dct, current_hr)
     filtered_assoc_recommendation = aggregator.get_final_recommendations()
 
-    # if len(filtered_assoc_recommendation) == 0:
-    #     final_recommendation = {
-    #         "message": "Popular Recommendation",
-    #         "recommendedItems": enrich_with_upc(filtered_popular_recommendation[:final_top_n], name_to_upc_map)
-    #     }
-    # else:
-    #     final_recommendation = {
-    #         "message": "Association Recommendation",
-    #         "recommendedItems": enrich_with_upc(filtered_assoc_recommendation[:final_top_n], name_to_upc_map)
-    #     }
     base_recommendations = filtered_assoc_recommendation if filtered_assoc_recommendation else filtered_popular_recommendation
     # === Cross-match ===
     base_rec_upcs = [name_to_upc_map.get(name.lower(), "") for name in base_recommendations]
     logger.debug(base_rec_upcs)
 
     # === Load Fixed & Always ===
-    fixed_doc = await db.find_one(FixedProduct)
-    fixed_products = fixed_doc.products if fixed_doc else []
+    # fixed_products = await db.find(FixedProduct) if data.use_fixed_products else []
+    # always_products = await db.find(AlwaysRecommendProduct) if data.use_always_recommend else []
 
-    always_doc = await db.find_one(AlwaysRecommendProduct)
-    always_products = always_doc.products if always_doc else []
+    fixed_doc = await db.find_one(FixedProduct) if data.use_fixed_products else []
+    fixed_products = fixed_doc.products if fixed_doc else []
 
     logger.debug(fixed_products)
     logger.debug(always_products)

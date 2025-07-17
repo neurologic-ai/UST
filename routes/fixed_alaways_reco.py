@@ -47,4 +47,4 @@ async def upload_products(
             config.products = product_list
             config.updated_at = now
         await db.save(config)
-    return {"message": f"✅ {product_type.value.capitalize()} products uploaded."}
+    return {"message": f"{product_type.value.capitalize()} products uploaded."}

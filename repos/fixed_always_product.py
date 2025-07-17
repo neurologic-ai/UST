@@ -68,4 +68,11 @@ def merge_final_recommendations(
 
     # Deduplicate
     final_upcs = list(dict.fromkeys(final_upcs))
+    # Fallback: force-fill with repeat if needed
+    while len(final_upcs) < final_top_n and base_rec_upcs:
+        for upc in base_rec_upcs:
+            if len(final_upcs) >= final_top_n:
+                break
+            if upc not in final_upcs:
+                final_upcs.append(upc)
     return final_upcs[:final_top_n]

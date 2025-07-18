@@ -17,8 +17,9 @@ from fastapi import UploadFile, File
 import pandas as pd
 from models.db import BreakfastPopular, LunchPopular, DinnerPopular, OtherPopular, BreakfastAssociation, LunchAssociation, DinnerAssociation, OtherAssociation
 from initialize.helper import get_timing
+import random
 
-# router = APIRouter(tags=["Recommendation"])
+
 router = APIRouter(
     prefix="/api/v1",  # version prefix
     tags=["Recommendation V1"],
@@ -77,11 +78,12 @@ async def recommendation(
     # === Load Always upfront ===
     always_doc = await db.find_one(AlwaysRecommendProduct) if data.use_always_recommend else None
     always_products = always_doc.products if always_doc else []
-    always_upcs = {ap["UPC"] for ap in always_products}
+    always_upcs = [ap["UPC"] for ap in always_products]
 
     # === If Always alone is enough ===
     if data.use_always_recommend and len(always_upcs) >= final_top_n:
-        final_upcs = list(always_upcs)[:final_top_n]
+        # Pick a random sample of size N, no repeats
+        final_upcs = random.sample(always_upcs, k=final_top_n)
 
         upc_to_name_map = {ap["UPC"]: ap["Product Name"] for ap in always_products}
 

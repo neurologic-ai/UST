@@ -1,4 +1,5 @@
 from io import BytesIO
+import random
 from fastapi import HTTPException, UploadFile
 import pandas as pd
 from typing import List, Set
@@ -32,47 +33,52 @@ def merge_final_recommendations(
     always_products: List[AlwaysRecommendProduct],
     final_top_n: int
 ) -> List[str]:
-    fixed_upcs = {fp["UPC"] for fp in fixed_products}
-    always_upcs = {ap["UPC"] for ap in always_products}
+    fixed_upcs = [fp["UPC"] for fp in fixed_products]
+    always_upcs = [ap["UPC"] for ap in always_products]
 
     final_upcs = []
 
-    # If always-recommend fully fills slots → no need for anything else
+    # If always-recommend fully fills slots → random pick
     if len(always_upcs) >= final_top_n:
-        final_upcs = list(always_upcs)[:final_top_n]
-        return final_upcs
+        return random.sample(always_upcs, k=final_top_n)
 
-    # Otherwise, start with always
+    # Otherwise, start with all always
     final_upcs.extend(always_upcs)
     slots_left = final_top_n - len(final_upcs)
 
     if fixed_upcs:
-        # Find coincidences in base vs fixed
+        # Find overlap
         matched_fixed = [upc for upc in base_rec_upcs if upc in fixed_upcs]
         remaining_fixed = [fp["UPC"] for fp in fixed_products if fp["UPC"] not in matched_fixed]
 
         if matched_fixed:
-            # Some matches → fill with random fixed
+            # Fill with random fixed until matched_fixed full
             while len(matched_fixed) < slots_left and remaining_fixed:
-                matched_fixed.append(remaining_fixed.pop())
+                pick = random.choice(remaining_fixed)
+                matched_fixed.append(pick)
+                remaining_fixed.remove(pick)
+
             final_upcs.extend(matched_fixed[:slots_left])
             slots_left = final_top_n - len(final_upcs)
         else:
-            # No matches → fill entirely with random fixed
-            final_upcs.extend(remaining_fixed[:slots_left])
+            # No matches → fill with random fixed
+            num_to_sample = min(slots_left, len(remaining_fixed))
+            final_upcs.extend(random.sample(remaining_fixed, k=num_to_sample))
             slots_left = final_top_n - len(final_upcs)
 
     # Fill any remaining slots with fallback base recs
     fallback = [upc for upc in base_rec_upcs if upc not in final_upcs]
     final_upcs.extend(fallback[:slots_left])
 
-    # Deduplicate
+    # Deduplicate, keep order
     final_upcs = list(dict.fromkeys(final_upcs))
-    # Fallback: force-fill with repeat if needed
+
+    # Final force-fill if still short, no duplicates
     while len(final_upcs) < final_top_n and base_rec_upcs:
         for upc in base_rec_upcs:
             if len(final_upcs) >= final_top_n:
                 break
             if upc not in final_upcs:
                 final_upcs.append(upc)
+
     return final_upcs[:final_top_n]

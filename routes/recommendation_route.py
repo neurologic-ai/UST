@@ -1,11 +1,13 @@
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException
-
+from loguru import logger
 from odmantic import AIOEngine
 from auth.api_key import get_api_key
+from models.fixed_always_reco import AlwaysRecommendProduct, FixedProduct
 from models.schema import RecommendationRequestBody
 from models.hepler import categories_dct, Aggregation, enrich_with_upc, get_product_names_from_upcs
 from db.singleton import get_engine
+from repos.fixed_always_product import merge_final_recommendations
 from routes.user_route import PermissionChecker
 from utils.helper import get_association_recommendations, get_popular_recommendation, load_lookup_dicts
 from configs.constant import PROCESSED_DATA_PATH, CATEGORY_DATA_PATH, TIME_SLOTS
@@ -15,8 +17,9 @@ from fastapi import UploadFile, File
 import pandas as pd
 from models.db import BreakfastPopular, LunchPopular, DinnerPopular, OtherPopular, BreakfastAssociation, LunchAssociation, DinnerAssociation, OtherAssociation
 from initialize.helper import get_timing
+import random
 
-# router = APIRouter(tags=["Recommendation"])
+
 router = APIRouter(
     prefix="/api/v1",  # version prefix
     tags=["Recommendation V1"],
@@ -67,26 +70,34 @@ async def upload_csvs(
 @router.post("/recommendation")
 async def recommendation(
     data: RecommendationRequestBody,
-    # athorize:bool = Depends(PermissionChecker(['items:read'])),
     db: AIOEngine = Depends(get_engine)
 ):
-    # if not athorize:
-    #     return HTTPException(status_code = 403, detail = "User don't have acess to see the recommendation")
-    ######################################
     final_top_n = data.topN
     top_n = final_top_n + 50
 
-    # cart_items = [item.strip().lower() for item in data.cartItems]
-    # cart_upcs = data.cartItems
+    # === Load Always upfront ===
+    always_doc = await db.find_one(AlwaysRecommendProduct)
+    always_products = always_doc.products if always_doc else []
+    always_upcs = [ap["UPC"] for ap in always_products]
+
+    # === If Always alone is enough ===
+    if len(always_upcs) >= final_top_n:
+        # Pick a random sample of size N, no repeats
+        final_upcs = random.sample(always_upcs, k=final_top_n)
+
+        upc_to_name_map = {ap["UPC"]: ap["Product Name"] for ap in always_products}
+
+        final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs]
+        logger.debug("Re Plus Engine No Execute")
+        return {
+            "message": " Always Recommend used directly",
+            "recommendedItems": final_result
+        }
+    logger.debug("Re Plus Engine Execute")
+
     name_to_upc_map, upc_to_name_map = load_lookup_dicts()
     cart_items = [upc_to_name_map.get(upc.strip(), "") for upc in data.cartItems]
-    # cart_items = get_product_names_from_upcs(cart_upcs)
     current_hr = data.currentHour
-    # current_dayofweek = data.current_dayofweek
-    # current_weather_category = data.current_weather_category
-    # current_holiday = data.current_holiday
-
-    ######################################
     timing_category = get_timing(current_hr, TIME_SLOTS)
     # Gather all recommendations concurrently
     if timing_category == 'Breakfast':
@@ -116,18 +127,20 @@ async def recommendation(
     aggregator = Aggregation(assoc_recommendations, cart_items, categories_dct, current_hr)
     filtered_assoc_recommendation = aggregator.get_final_recommendations()
 
-    # if len(filtered_assoc_recommendation) == 0:
-    #     final_recommendation = {"message" : "Popular Recommendation", "recommendedItems": filtered_popular_recommendation[:final_top_n]}
-    # else:
-    #     final_recommendation = {"message" : "Association Recommendation", "recommendedItems": filtered_assoc_recommendation[:final_top_n]}
-    if len(filtered_assoc_recommendation) == 0:
-        final_recommendation = {
-            "message": "Popular Recommendation",
-            "recommendedItems": enrich_with_upc(filtered_popular_recommendation[:final_top_n], name_to_upc_map)
-        }
-    else:
-        final_recommendation = {
-            "message": "Association Recommendation",
-            "recommendedItems": enrich_with_upc(filtered_assoc_recommendation[:final_top_n], name_to_upc_map)
-        }
-    return final_recommendation
+    base_recommendations = filtered_assoc_recommendation if filtered_assoc_recommendation else filtered_popular_recommendation
+    # === Cross-match ===
+    base_rec_upcs = [name_to_upc_map.get(name.lower(), "") for name in base_recommendations]
+    # logger.debug(base_rec_upcs)
+
+    # === Load Fixed & Always ===
+    fixed_doc = await db.find_one(FixedProduct)
+    fixed_products = fixed_doc.products if fixed_doc else []
+
+    final_upcs = merge_final_recommendations(base_rec_upcs, fixed_products, always_products, final_top_n)
+
+    final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs]
+
+    return {
+        "message": "Final Recommendation",
+        "recommendedItems": final_result
+    }

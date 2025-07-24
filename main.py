@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from routes.recommendation_route import router as recommendation_router
 from routes.user_route import router as user_router
+from routes.fixed_alaways_reco import router as fixed_router
 from loguru import logger
 from fastapi.middleware.cors import CORSMiddleware
 import fastapi
@@ -13,7 +14,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 def initialize_backend_application() -> fastapi.FastAPI:
     logger.info("Starting FastAPI application")
-    app = FastAPI()
+    app = FastAPI(
+        docs_url="/api/v1/docs",
+        redoc_url="/api/v1/redoc",                
+        openapi_url="/api/v1/openapi.json"
+    )
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=2)
     app.add_event_handler("startup", startup_event())
     app.add_event_handler("shutdown", shutdown_event())
@@ -27,6 +32,7 @@ def initialize_backend_application() -> fastapi.FastAPI:
     app.add_middleware(ExceptionHandlerMiddleware)
     app.include_router(recommendation_router)
     app.include_router(user_router)
+    app.include_router(fixed_router)
     return app
 
 

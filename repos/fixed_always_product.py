@@ -4,6 +4,7 @@ from fastapi import HTTPException, UploadFile
 import pandas as pd
 from typing import List, Set
 from models.fixed_always_reco import AlwaysRecommendProduct, FixedProduct
+from utils.error_codes import UPLOAD_ERRORS
 
 
 REQUIRED_COLUMNS = ["UPC", "Product Name"]
@@ -16,15 +17,19 @@ async def parse_upload(file: UploadFile) -> pd.DataFrame:
     elif file.filename.endswith(".xlsx"):
         df = pd.read_excel(BytesIO(contents))
     else:
-        raise HTTPException(status_code=400, detail="File must be .csv or .xlsx")
+        raise HTTPException(status_code=400, detail=UPLOAD_ERRORS["INVALID_FILE_TYPE"])
     return df
 
 async def validate_df(df: pd.DataFrame):
     missing = set(REQUIRED_COLUMNS) - set(df.columns)
     if missing:
-        raise HTTPException(status_code=400, detail=f"Missing columns: {missing}")
+        err = UPLOAD_ERRORS["MISSING_COLUMNS"]
+        raise HTTPException(status_code=400, detail={
+            "errorCode": err["errorCode"],
+            "message": f"{err['message']} Missing: {missing}"
+        })
     if df[REQUIRED_COLUMNS].isnull().any().any():
-        raise HTTPException(status_code=400, detail="Empty UPC or Product Name values found.")
+        raise HTTPException(status_code=400, detail=UPLOAD_ERRORS["EMPTY_VALUES"])
 
 
 def merge_final_recommendations(

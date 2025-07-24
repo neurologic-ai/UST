@@ -76,23 +76,24 @@ async def recommendation(
     top_n = final_top_n + 50
 
     # === Load Always upfront ===
-    always_doc = await db.find_one(AlwaysRecommendProduct) if data.use_always_recommend else None
+    always_doc = await db.find_one(AlwaysRecommendProduct)
     always_products = always_doc.products if always_doc else []
     always_upcs = [ap["UPC"] for ap in always_products]
 
     # === If Always alone is enough ===
-    if data.use_always_recommend and len(always_upcs) >= final_top_n:
+    if len(always_upcs) >= final_top_n:
         # Pick a random sample of size N, no repeats
         final_upcs = random.sample(always_upcs, k=final_top_n)
 
         upc_to_name_map = {ap["UPC"]: ap["Product Name"] for ap in always_products}
 
         final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs]
+        logger.debug("Re Plus Engine No Execute")
         return {
-            "message": "✅ Always Recommend used directly",
+            "message": " Always Recommend used directly",
             "recommendedItems": final_result
         }
-
+    logger.debug("Re Plus Engine Execute")
 
     name_to_upc_map, upc_to_name_map = load_lookup_dicts()
     cart_items = [upc_to_name_map.get(upc.strip(), "") for upc in data.cartItems]
@@ -129,29 +130,17 @@ async def recommendation(
     base_recommendations = filtered_assoc_recommendation if filtered_assoc_recommendation else filtered_popular_recommendation
     # === Cross-match ===
     base_rec_upcs = [name_to_upc_map.get(name.lower(), "") for name in base_recommendations]
-    logger.debug(base_rec_upcs)
+    # logger.debug(base_rec_upcs)
 
     # === Load Fixed & Always ===
-    # fixed_products = await db.find(FixedProduct) if data.use_fixed_products else []
-    # always_products = await db.find(AlwaysRecommendProduct) if data.use_always_recommend else []
-
-    fixed_doc = await db.find_one(FixedProduct) if data.use_fixed_products else []
+    fixed_doc = await db.find_one(FixedProduct)
     fixed_products = fixed_doc.products if fixed_doc else []
-
-    logger.debug(fixed_products)
-    logger.debug(always_products)
-    # Now extend the upc_to_name_map with the fixed and always products:
-    for fp in fixed_products:
-        upc_to_name_map[fp["UPC"]] = fp["Product Name"]
-
-    for ap in always_products:
-        upc_to_name_map[ap["UPC"]] = ap["Product Name"]
 
     final_upcs = merge_final_recommendations(base_rec_upcs, fixed_products, always_products, final_top_n)
 
     final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs]
 
     return {
-        "message": "✅ Final Recommendation",
+        "message": "Final Recommendation",
         "recommendedItems": final_result
     }

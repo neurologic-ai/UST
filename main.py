@@ -14,7 +14,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 def initialize_backend_application() -> fastapi.FastAPI:
     logger.info("Starting FastAPI application")
-    app = FastAPI()
+    app = FastAPI(
+        docs_url="/api/v1/docs",
+        redoc_url="/api/v1/redoc",                
+        openapi_url="/api/v1/openapi.json"
+    )
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=2)
     app.add_event_handler("startup", startup_event())
     app.add_event_handler("shutdown", shutdown_event())

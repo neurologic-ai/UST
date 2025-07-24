@@ -8,9 +8,7 @@ class RecommendationRequestBody(BaseModel):
     cartItems: List = ['4011002']
     currentHour: int = 17
     topN: int = 2
-    use_fixed_products: bool = True
-    use_always_recommend: bool = True
-
+    
 class UserBase(BaseModel):
     username: str
     password: str

@@ -20,7 +20,7 @@ class BackendBaseSettings(BaseSettings):
     REDIS_PORT: int = decouple.config("REDIS_PORT")
     GEOCODE_API_KEY: str = decouple.config("GEOCODE_API_KEY")
     GEOCODE_BASE_URL: str = decouple.config("GEOCODE_BASE_URL")
-    
+    ENV_NAME: str = decouple.config("ENV_NAME")
     
     IS_ALLOWED_CREDENTIALS: bool = True
     # get the list of allowed origins from the environment variable

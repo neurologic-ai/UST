@@ -26,10 +26,12 @@ from loguru import logger
 import traceback
 from initialize.helper import load_lookup_dicts
 from weather.api_call import get_weather_feel
+from configs.manager import settings
 import json
 import zipfile
 import io
 import base64
+
 
 
 def normalize_key(name: str) -> str:
@@ -134,10 +136,24 @@ async def upload_csvs(
 
         end_time = time.perf_counter()
         logger.debug(f"Validated store_ids and location_id in {end_time - start_time:.2f} seconds")
-
         processed.file.seek(0)  # Reset before upload
-        processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=uploaded_store_ids)
+        if settings.ENV_NAME == "PROD":
+            processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=uploaded_store_ids)
+        elif settings.ENV_NAME == "LOCAL":
+            await delete_documents_for_tenant_location_and_store_ids(tenantId, locationId, list(uploaded_store_ids))
+            CHUNK_SIZE = 10000
+            # Step 1: Read both files into pandas DataFrames
+            df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str})
+            all_tasks = [
+                process_chunk(df_processed, tenantId, locationId)
+                for df_processed in df_processed_chunks
+            ]
 
+            # Run all chunk processes concurrently
+            results = await asyncio.gather(*all_tasks)
+            logger.debug("Data is stored successfully")
+        else:
+            raise HTTPException(status_code=400, detail="Please set ENV_NAME as either 'PROD' or 'LOCAL'.")
         return {
             "message": "Sales data has been uploaded successfully",
             "storeCSount": len(uploaded_store_ids)

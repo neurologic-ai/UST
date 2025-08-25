@@ -90,11 +90,13 @@ async def upload_products(
                 location_id=locationId,
                 store_id=storeId,
                 products=valid_products,
-                created_at=now
+                created_at=now,
+                created_by=str(authorize.id)
             )
         else:
             config.products = valid_products
             config.updated_at = now
+            config.updated_by=str(authorize.id)
         await db.save(config)
 
     elif productType == ProductType.always:
@@ -110,11 +112,13 @@ async def upload_products(
                 location_id=locationId,
                 store_id=storeId,
                 products=valid_products,
-                created_at=now
+                created_at=now,
+                created_by=str(authorize.id)
             )
         else:
             config.products = valid_products
             config.updated_at = now
+            config.updated_by=str(authorize.id)
         await db.save(config)
 
     if skipped_upcs:
@@ -140,6 +144,7 @@ async def clear_products(
     locationId: str,
     storeId: str,
     productType: ProductType,
+    authorize: bool = Depends(PermissionChecker(['items:write'])),
     db: AIOEngine = Depends(get_engine)
 ):
     now = datetime.utcnow()

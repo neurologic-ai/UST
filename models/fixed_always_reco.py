@@ -14,6 +14,7 @@ class FixedProduct(Model):
     store_id: str
     products: List[Dict]
     created_at: datetime = datetime.utcnow()
+    created_by: Optional[str] = None
     updated_at: Optional[datetime] = None
     updated_by: Optional[str] = None
 
@@ -23,5 +24,6 @@ class AlwaysRecommendProduct(Model):
     store_id: str
     products: List[Dict]
     created_at: datetime = datetime.utcnow()
+    created_by: Optional[str] = None
     updated_at: Optional[datetime] = None
     updated_by: Optional[str] = None

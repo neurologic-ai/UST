@@ -84,8 +84,8 @@ async def create_index():
              "tenant_id_1_location_id_1_store_id_1"),
             # Lookup collection with 2-field compound index
             (lookup_collection,
-             [("tenant_id", 1), ("location_id", 1)],
-             "tenant_id_1_location_id_1"),
+             [("tenant_id", 1), ("location_id", 1), ("store_id", 1)],
+             "tenant_id_1_location_id_1_store_id_1"),
              (category_cache_collection,
              [("tenant_id", 1), ("location_id", 1)],
              "tenant_id_1_location_id_1")

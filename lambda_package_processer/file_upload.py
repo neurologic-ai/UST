@@ -23,9 +23,7 @@ def upload_file_to_s3(file, csv_type, tenant_id, location_id):
         s3_client.upload_fileobj(file, settings.bucket_name, dest_name)
         file_url = f"https://{settings.bucket_name}.s3.amazonaws.com/{dest_name}"
         return file_url
-    except NoCredentialsError:
-        print("Credentials not available.")
-        return None
+    except NoCredentialsError as e:
+        raise RuntimeError("AWS credentials not available") from e
     except Exception as e:
-        print(f"Error uploading file: {e}")
-        return None
+        raise RuntimeError("Failed to upload file to S3") from e

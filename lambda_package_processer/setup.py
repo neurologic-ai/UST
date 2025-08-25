@@ -18,10 +18,12 @@ def build_lookup_dicts(df):
     upc_to_name = dict(zip(df['UPC'], df['Product_name']))
     return name_to_upc, upc_to_name
 
-async def save_lookup_dicts(tenant_id, location_id, name_to_upc, upc_to_name):
+async def save_lookup_dicts(tenant_id: str, location_id: str, store_id: str, name_to_upc: dict, upc_to_name: dict):
     try:
         # Fetch existing doc
-        existing = await lookup_collection.find_one({"tenant_id": tenant_id, "location_id": location_id}) or {}
+        existing = await lookup_collection.find_one(
+            {"tenant_id": tenant_id, "location_id": location_id, "store_id": store_id}
+        ) or {}
 
         # Merge into existing
         merged_name_to_upc = {**existing.get("name_to_upc", {}), **name_to_upc}
@@ -31,13 +33,14 @@ async def save_lookup_dicts(tenant_id, location_id, name_to_upc, upc_to_name):
         lookup_doc = {
             "tenant_id": tenant_id,
             "location_id": location_id,
+            "store_id": store_id,
             "name_to_upc": merged_name_to_upc,
             "upc_to_name": merged_upc_to_name
         }
 
         # Upsert with full merged doc
-        lookup_collection.update_one(
-            {"tenant_id": tenant_id, "location_id": location_id},
+        await lookup_collection.update_one(
+            {"tenant_id": tenant_id, "location_id": location_id, "store_id": store_id},
             {"$set": lookup_doc},
             upsert=True
         )
@@ -46,6 +49,7 @@ async def save_lookup_dicts(tenant_id, location_id, name_to_upc, upc_to_name):
         logger.debug("❌ Failed to merge lookup_collection")
         logger.debug(traceback.format_exc())
         raise
+
 
 
 # Mapping for time slots to collection names
@@ -89,8 +93,12 @@ async def run_models_and_store_outputs(tenant_id, location_id, df: pd.DataFrame 
         df = preprocessor.preprocess(df)
         logger.debug("Preprocessing Done")
             # Build and save lookup dictionaries
-        name_to_upc_map, upc_to_name_map = build_lookup_dicts(df)
-        await save_lookup_dicts(tenant_id, location_id, name_to_upc_map, upc_to_name_map)
+        # group & upsert
+        for store_id, df_store in df.groupby("store_id"):
+            # IMPORTANT: Product_name should already be normalized before this function
+            name_to_upc_map, upc_to_name_map = build_lookup_dicts(df_store)
+            await save_lookup_dicts(tenant_id, location_id, store_id, name_to_upc_map, upc_to_name_map)
+
         logger.debug("look_up Dict Saved in Mongo")
         tasks = []
         for tm in TIMINGS:
@@ -103,3 +111,4 @@ async def run_models_and_store_outputs(tenant_id, location_id, df: pd.DataFrame 
     except Exception as e:
         logger.debug(f"Error occurred: {str(e)}")
         logger.debug(f"Full traceback:\n{traceback.format_exc()}")
+

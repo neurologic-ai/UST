@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+import random
 import time
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -8,9 +9,11 @@ import redis.asyncio as redis
 from auth.api_key import get_current_tenant
 from auth.tenant_user_verify import check_user_role_and_status
 from db.redis_client import get_redis_client
+from models.fixed_always_reco import AlwaysRecommendProduct, FixedProduct
 from models.schema import RecommendationRequestBody
 from models.hepler import Product, Aggregation
 from db.singleton import get_engine
+from repos.fixed_always_product import merge_final_recommendations
 from repos.reco_repos import get_categories_for_products, get_categories_from_cache_or_s3, validate_csv_columns
 from routes.user_route import PermissionChecker
 from utils.file_upload import upload_file_to_s3
@@ -197,13 +200,33 @@ async def recommendation(
 
         if store.lat is None or store.lon is None:
             raise HTTPException(status_code=400, detail="Store does not have lat/lon info")
+        # === Load Always upfront ===
+        final_top_n = data.topN
+        top_n = final_top_n + 50
+        always_doc = await db.find_one(AlwaysRecommendProduct)
+        always_products = always_doc.products if always_doc else []
+        always_upcs = [ap["UPC"] for ap in always_products]
 
+        # === If Always alone is enough ===
+        if len(always_upcs) >= final_top_n:
+            # Pick a random sample of size N, no repeats
+            final_upcs = random.sample(always_upcs, k=final_top_n)
+
+            upc_to_name_map = {ap["UPC"]: ap["Product Name"] for ap in always_products}
+
+            final_result = [{"upc": upc, "name": upc_to_name_map.get(upc, "")} for upc in final_upcs]
+            logger.debug("Re Plus Engine No Execute")
+            return {
+                "message": " Always Recommend used directly",
+                "recommendedItems": final_result
+            }
+        logger.debug("Re Plus Engine Execute")
         # Get weather using store coordinates
         weather = await get_weather_feel(lat=store.lat, lon=store.lon, dt=current_datetime, redis_client=r)
         # weather = "moderate"
         logger.debug(weather)
         # Load lookup dictionaries for the given tenant and location
-        name_to_upc, upc_to_name = await load_lookup_dicts(tenant_id, data.locationId)
+        name_to_upc, upc_to_name = await load_lookup_dicts(tenant_id, data.locationId, data.storeId)
 
         if not name_to_upc or not upc_to_name:
             return JSONResponse(
@@ -211,11 +234,6 @@ async def recommendation(
                 content={"message": "Lookup dictionaries not found for given tenant and location."}
             )
 
-        final_top_n = data.topN
-        top_n = final_top_n + 50
-
-
-        # current_hr = data.currentHour
         ######################################
         timing_category = get_timing(current_hr, TIME_SLOTS)
         logger.debug(timing_category)
@@ -266,32 +284,59 @@ async def recommendation(
             run_aggregation(popular_names, cart_items, categories_dct, current_hr, weather),
             run_aggregation(assoc_names, cart_items, categories_dct, current_hr, weather),
         )
-
-
+        fixed_doc = await db.find_one(FixedProduct)
+        fixed_products = fixed_doc.products if fixed_doc else []
+        logger.debug(fixed_products)
+        logger.debug(always_products)
+        # Choose base list and convert to UPCs
         if filtered_assoc_names:
-            final_recommendation = {
-                "message": "Association Recommendation",
-                "recommendedItems": [
-                    {
-                        "name": name,
-                        "upc": assoc_data_dict[name].upc
-                    }
-                    for name in filtered_assoc_names
-                    if name in assoc_data_dict
-                ][:data.topN]
-            }
+            base_names = filtered_assoc_names
+            base_upcs = [assoc_data_dict[n].upc for n in base_names if n in assoc_data_dict]
+            base_msg = "Association Recommendation"
         else:
-            final_recommendation = {
-                "message": "Popular Recommendation",
-                "recommendedItems": [
-                    {
-                        "name": name,
-                        "upc": popular_data_dict[name].upc
-                    }
-                    for name in filtered_popular_names
-                    if name in popular_data_dict
-                ][:data.topN]
-            }
+            base_names = filtered_popular_names
+            base_upcs = [popular_data_dict[n].upc for n in base_names if n in popular_data_dict]
+            base_msg = "Popular Recommendation"
+
+        # ---------- Merge with Fixed & Always (store-scoped) ----------
+        # merge_final_recommendations(base_upcs, fixed_products, always_products, N)
+        final_upcs = merge_final_recommendations(base_upcs, fixed_products, always_products, final_top_n)
+
+        final_result = [{"upc": u, "name": upc_to_name.get(u, "")} for u in final_upcs]
+
+        end_time = time.perf_counter()
+        logger.debug(f"elapsed: {end_time - start_time:.3f} seconds")
+
+        return {
+            "message": "Final Recommendation",
+            "recommendedItems": final_result
+        }
+
+
+        # if filtered_assoc_names:
+        #     final_recommendation = {
+        #         "message": "Association Recommendation",
+        #         "recommendedItems": [
+        #             {
+        #                 "name": name,
+        #                 "upc": assoc_data_dict[name].upc
+        #             }
+        #             for name in filtered_assoc_names
+        #             if name in assoc_data_dict
+        #         ][:data.topN]
+        #     }
+        # else:
+        #     final_recommendation = {
+        #         "message": "Popular Recommendation",
+        #         "recommendedItems": [
+        #             {
+        #                 "name": name,
+        #                 "upc": popular_data_dict[name].upc
+        #             }
+        #             for name in filtered_popular_names
+        #             if name in popular_data_dict
+        #         ][:data.topN]
+        #     }
         end_time = time.perf_counter()
         logger.debug(f"start_time: {start_time}")
         logger.debug(f"end_time: {end_time}")

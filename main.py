@@ -11,6 +11,7 @@ from configs.events import startup_event, shutdown_event
 from fastapi.middleware.gzip import GZipMiddleware
 from routes.tenant_route import router as tenant_router
 from routes.store_route import router as store_router
+from routes.fixed_alaways_reco_route import router as fixed_router
 
 
 def initialize_backend_application() -> fastapi.FastAPI:
@@ -35,6 +36,7 @@ def initialize_backend_application() -> fastapi.FastAPI:
     app.include_router(user_router)
     app.include_router(tenant_router)
     app.include_router(store_router)
+    app.include_router(fixed_router)
     return app
 
 

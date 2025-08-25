@@ -155,16 +155,18 @@ async def insert_data(collection_name, inp_data, many=True, dataset_name=''):
 
 
 
-async def load_lookup_dicts(tenant_id, location_id):
+async def load_lookup_dicts(tenant_id: str, location_id: str, store_id: str):
     doc = await lookup_collection.find_one({
         "tenant_id": tenant_id,
-        "location_id": location_id
+        "location_id": location_id,
+        "store_id": store_id
     })
 
     if doc:
         return doc.get("name_to_upc", {}), doc.get("upc_to_name", {})
     else:
         return {}, {}
+
 
 
 async def insert_popular_items_dict_style(collection, popular_data: list):

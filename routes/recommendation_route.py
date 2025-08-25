@@ -141,8 +141,8 @@ async def upload_csvs(
         logger.debug(f"Validated store_ids and location_id in {end_time - start_time:.2f} seconds")
         processed.file.seek(0)  # Reset before upload
         if settings.ENV_NAME == "PROD":
-        #     processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=uploaded_store_ids)
-        # elif settings.ENV_NAME == "LOCAL":
+            processed_url = upload_file_to_s3(processed.file, "processed", tenantId, locationId, store_ids=uploaded_store_ids)
+        elif settings.ENV_NAME == "LOCAL":
             await delete_documents_for_tenant_location_and_store_ids(tenantId, locationId, list(uploaded_store_ids))
             CHUNK_SIZE = 10000
             # Step 1: Read both files into pandas DataFrames

@@ -177,14 +177,10 @@ async def recommendation(
     tenant: Tenant = Depends(get_current_tenant)
     ):
     try:
-        start_time = time.perf_counter()
         current_hr = data.currentHour
         current_datetime = datetime.utcnow()
         tenant_id = str(tenant.id)
 
-        logger.debug(current_datetime)
-        logger.debug(current_hr)
-        logger.debug(tenant_id)
         if not (0 <= data.currentHour <= 23):
             raise HTTPException(status_code=400, detail="currentHour must be between 0 and 23")
 
@@ -286,64 +282,26 @@ async def recommendation(
         )
         fixed_doc = await db.find_one(FixedProduct)
         fixed_products = fixed_doc.products if fixed_doc else []
-        logger.debug(fixed_products)
-        logger.debug(always_products)
         # Choose base list and convert to UPCs
         if filtered_assoc_names:
             base_names = filtered_assoc_names
             base_upcs = [assoc_data_dict[n].upc for n in base_names if n in assoc_data_dict]
-            base_msg = "Association Recommendation"
         else:
             base_names = filtered_popular_names
             base_upcs = [popular_data_dict[n].upc for n in base_names if n in popular_data_dict]
-            base_msg = "Popular Recommendation"
 
         # ---------- Merge with Fixed & Always (store-scoped) ----------
         # merge_final_recommendations(base_upcs, fixed_products, always_products, N)
         final_upcs = merge_final_recommendations(base_upcs, fixed_products, always_products, final_top_n)
 
         final_result = [{"upc": u, "name": upc_to_name.get(u, "")} for u in final_upcs]
-
-        end_time = time.perf_counter()
-        logger.debug(f"elapsed: {end_time - start_time:.3f} seconds")
+        final_result = [{"upc": u, "name":upc_to_name.get(u, "")} for u in final_upcs if u in upc_to_name]
 
         return {
             "message": "Final Recommendation",
             "recommendedItems": final_result
         }
 
-
-        # if filtered_assoc_names:
-        #     final_recommendation = {
-        #         "message": "Association Recommendation",
-        #         "recommendedItems": [
-        #             {
-        #                 "name": name,
-        #                 "upc": assoc_data_dict[name].upc
-        #             }
-        #             for name in filtered_assoc_names
-        #             if name in assoc_data_dict
-        #         ][:data.topN]
-        #     }
-        # else:
-        #     final_recommendation = {
-        #         "message": "Popular Recommendation",
-        #         "recommendedItems": [
-        #             {
-        #                 "name": name,
-        #                 "upc": popular_data_dict[name].upc
-        #             }
-        #             for name in filtered_popular_names
-        #             if name in popular_data_dict
-        #         ][:data.topN]
-        #     }
-        end_time = time.perf_counter()
-        logger.debug(f"start_time: {start_time}")
-        logger.debug(f"end_time: {end_time}")
-        logger.debug(f"elapsed: {end_time - start_time:.3f} seconds")
-
-
-        return final_recommendation
     except:
         logger.debug(traceback.format_exc())
         raise

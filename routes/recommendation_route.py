@@ -292,13 +292,22 @@ async def recommendation(
         else:
             base_names = filtered_popular_names
             base_upcs = [popular_data_dict[n].upc for n in base_names if n in popular_data_dict]
+        # Build small maps
+        always_map = {str(ap["UPC"]).strip(): (ap.get("Product Name") or "").strip()
+                    for ap in always_products if ap.get("UPC")}
+        fixed_map  = {str(fp["UPC"]).strip(): (fp.get("Product Name") or "").strip()
+                    for fp in fixed_products  if fp.get("UPC")}
+
+        # Merge into the existing upc_to_name (overwrites if key already exists)
+        upc_to_name.update(fixed_map)
+        upc_to_name.update(always_map)
 
         # ---------- Merge with Fixed & Always (store-scoped) ----------
         # merge_final_recommendations(base_upcs, fixed_products, always_products, N)
         final_upcs = merge_final_recommendations(base_upcs, fixed_products, always_products, final_top_n)
         logger.debug("final recommendation done")
 
-        final_result = [{"upc": u, "name": upc_to_name.get(u, "")} for u in final_upcs]
+        # final_result = [{"upc": u, "name": upc_to_name.get(u, "")} for u in final_upcs]
         final_result = [{"upc": u, "name":upc_to_name.get(u, "")} for u in final_upcs if u in upc_to_name]
 
         return {

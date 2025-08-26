@@ -220,9 +220,10 @@ async def recommendation(
         # Get weather using store coordinates
         weather = await get_weather_feel(lat=store.lat, lon=store.lon, dt=current_datetime, redis_client=r)
         # weather = "moderate"
-        logger.debug(weather)
+        # logger.debug(weather)
         # Load lookup dictionaries for the given tenant and location
         name_to_upc, upc_to_name = await load_lookup_dicts(tenant_id, data.locationId, data.storeId)
+        logger.debug("lookup dict loaded")
 
         if not name_to_upc or not upc_to_name:
             return JSONResponse(
@@ -269,6 +270,7 @@ async def recommendation(
         assoc_data_dict, assoc_names = assoc_result
         all_required_names = set(popular_names + assoc_names + cart_items)
         categories_dct = await get_categories_for_products(list(all_required_names), tenant_id, data.locationId, db)
+        logger.debug("Category obtained")
 
         # ✅ Define helper function locally
         async def run_aggregation(name_list, cart_items, categories, current_hr, weather):
@@ -280,6 +282,7 @@ async def recommendation(
             run_aggregation(popular_names, cart_items, categories_dct, current_hr, weather),
             run_aggregation(assoc_names, cart_items, categories_dct, current_hr, weather),
         )
+        logger.debug("aggreagation done")
         fixed_doc = await db.find_one(FixedProduct)
         fixed_products = fixed_doc.products if fixed_doc else []
         # Choose base list and convert to UPCs
@@ -293,6 +296,7 @@ async def recommendation(
         # ---------- Merge with Fixed & Always (store-scoped) ----------
         # merge_final_recommendations(base_upcs, fixed_products, always_products, N)
         final_upcs = merge_final_recommendations(base_upcs, fixed_products, always_products, final_top_n)
+        logger.debug("final recommendation done")
 
         final_result = [{"upc": u, "name": upc_to_name.get(u, "")} for u in final_upcs]
         final_result = [{"upc": u, "name":upc_to_name.get(u, "")} for u in final_upcs if u in upc_to_name]

@@ -3,12 +3,12 @@ from odmantic import AIOEngine
 
 
 async def get_popular_recommendation(engine: AIOEngine, top_n: int, model, filters: dict):
-    print(f"[Popular] Filters: {filters}")
-
+    # print(f"[Popular] Filters: {filters}")
+    logger.debug("popular started")
     # Fetch all matching documents (i.e., all chunks)
     docs = await engine.find(model, filters)
     if not docs:
-        print("[Popular] No matching documents found")
+        # print("[Popular] No matching documents found")
         return {}, []
 
     combined_popular = {}
@@ -24,7 +24,8 @@ async def get_popular_recommendation(engine: AIOEngine, top_n: int, model, filte
                 combined_popular[name].count += val.count
 
     if not combined_popular:
-        print("[Popular] No popular_data across chunks")
+        logger.debug("no popular data")
+        # print("[Popular] No popular_data across chunks")
         return {}, []
 
     sorted_items = sorted(
@@ -34,11 +35,13 @@ async def get_popular_recommendation(engine: AIOEngine, top_n: int, model, filte
     )
 
     top_names = [name for name, _ in sorted_items[:top_n]]
+    logger.debug("popular done")
     return combined_popular, top_names
 
 
 async def get_association_recommendations(engine: AIOEngine, cart_items: list, top_n: int, model, filters: dict):
     print(f"[Association] Base filters: {filters}")
+    logger.debug("Association started")
     combined_assocs = {}
 
     for product in cart_items:
@@ -64,4 +67,5 @@ async def get_association_recommendations(engine: AIOEngine, cart_items: list, t
 
     sorted_items = sorted(combined_assocs.items(), key=lambda x: x[1].count, reverse=True)
     top_names = [name for name, _ in sorted_items[:top_n]]
+    logger.debug("Association done")
     return combined_assocs, top_names

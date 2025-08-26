@@ -297,7 +297,9 @@ async def recommendation(
                     for ap in always_products if ap.get("UPC")}
         fixed_map  = {str(fp["UPC"]).strip(): (fp.get("Product Name") or "").strip()
                     for fp in fixed_products  if fp.get("UPC")}
-
+        logger.debug(base_upcs)
+        logger.debug(fixed_map)
+        logger.debug(always_map)
         # Merge into the existing upc_to_name (overwrites if key already exists)
         upc_to_name.update(fixed_map)
         upc_to_name.update(always_map)

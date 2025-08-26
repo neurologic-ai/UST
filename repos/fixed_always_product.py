@@ -1,5 +1,6 @@
 from io import BytesIO
 import random
+import itertools
 from fastapi import HTTPException, UploadFile
 import pandas as pd
 from typing import List, Set
@@ -34,56 +35,71 @@ async def validate_df(df: pd.DataFrame):
 
 def merge_final_recommendations(
     base_rec_upcs: List[str],
-    fixed_products: List[FixedProduct],
-    always_products: List[AlwaysRecommendProduct],
+    fixed_products: List[dict],
+    always_products: List[dict],
     final_top_n: int
 ) -> List[str]:
-    fixed_upcs = [fp["UPC"] for fp in fixed_products]
-    always_upcs = [ap["UPC"] for ap in always_products]
+    """
+    Safe, non-blocking version.
+    - Adds ALL unique Always first (or samples N from Always if Always >= N)
+    - Uses Fixed next: first those that overlap with Base (preserving Base order), then random from remaining Fixed
+    - Fills any remaining slots ONLY from Base (unique, in order)
+    - Never loops infinitely; may return < N if not enough unique UPCs exist
+    """
+    if final_top_n <= 0:
+        return []
 
-    final_upcs = []
+    fixed_upcs  = [fp["UPC"] for fp in (fixed_products or [])]
+    always_upcs = [ap["UPC"] for ap in (always_products or [])]
 
-    # If always-recommend fully fills slots → random pick
+    # If Always alone can fill the target, random sample and return
     if len(always_upcs) >= final_top_n:
         return random.sample(always_upcs, k=final_top_n)
 
-    # Otherwise, start with all always
-    final_upcs.extend(always_upcs)
+    final_upcs: List[str] = []
+    seen = set()
+
+    # 1) Add ALL unique Always
+    for u in always_upcs:
+        if u not in seen:
+            final_upcs.append(u)
+            seen.add(u)
+
     slots_left = final_top_n - len(final_upcs)
 
-    if fixed_upcs:
-        # Find overlap
-        matched_fixed = [upc for upc in base_rec_upcs if upc in fixed_upcs]
-        remaining_fixed = [fp["UPC"] for fp in fixed_products if fp["UPC"] not in matched_fixed]
+    # 2) Bring in Fixed (overlap with Base first, preserving Base order)
+    if slots_left > 0 and fixed_upcs:
+        fixed_set = set(fixed_upcs)
 
-        if matched_fixed:
-            # Fill with random fixed until matched_fixed full
-            while len(matched_fixed) < slots_left and remaining_fixed:
-                pick = random.choice(remaining_fixed)
-                matched_fixed.append(pick)
-                remaining_fixed.remove(pick)
-
-            final_upcs.extend(matched_fixed[:slots_left])
-            slots_left = final_top_n - len(final_upcs)
-        else:
-            # No matches → fill with random fixed
-            num_to_sample = min(slots_left, len(remaining_fixed))
-            final_upcs.extend(random.sample(remaining_fixed, k=num_to_sample))
-            slots_left = final_top_n - len(final_upcs)
-
-    # Fill any remaining slots with fallback base recs
-    fallback = [upc for upc in base_rec_upcs if upc not in final_upcs]
-    final_upcs.extend(fallback[:slots_left])
-
-    # Deduplicate, keep order
-    final_upcs = list(dict.fromkeys(final_upcs))
-
-    # Final force-fill if still short, no duplicates
-    while len(final_upcs) < final_top_n and base_rec_upcs:
-        for upc in base_rec_upcs:
-            if len(final_upcs) >= final_top_n:
+        # 2a) Fixed that appear in Base (respect Base order)
+        for u in base_rec_upcs:
+            if slots_left == 0:
                 break
-            if upc not in final_upcs:
-                final_upcs.append(upc)
+            if u in fixed_set and u not in seen:
+                final_upcs.append(u)
+                seen.add(u)
+                slots_left -= 1
 
+        # 2b) If slots remain, top-up from remaining Fixed at random
+        if slots_left > 0:
+            remaining_fixed = [u for u in fixed_upcs if u not in seen]
+            if remaining_fixed:
+                k = min(slots_left, len(remaining_fixed))
+                if k > 0:
+                    picks = random.sample(remaining_fixed, k=k)
+                    final_upcs.extend(picks)
+                    seen.update(picks)
+                    slots_left -= k
+
+    # 3) Fill remaining strictly from Base (unique, preserve order)
+    if slots_left > 0:
+        for u in base_rec_upcs:
+            if slots_left == 0:
+                break
+            if u not in seen:
+                final_upcs.append(u)
+                seen.add(u)
+                slots_left -= 1
+
+    # Return up to N (may be fewer if not enough unique UPCs exist)
     return final_upcs[:final_top_n]

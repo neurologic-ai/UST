@@ -199,7 +199,13 @@ async def recommendation(
         # === Load Always upfront ===
         final_top_n = data.topN
         top_n = final_top_n + 50
-        always_doc = await db.find_one(AlwaysRecommendProduct)
+        always_doc = await db.find_one(
+            AlwaysRecommendProduct,
+            (AlwaysRecommendProduct.tenant_id == tenant_id) &
+            (AlwaysRecommendProduct.location_id == data.locationId) &
+            (AlwaysRecommendProduct.store_id == data.storeId)
+        )
+        logger.debug(always_doc)
         always_products = always_doc.products if always_doc else []
         always_upcs = [ap["UPC"] for ap in always_products]
 
@@ -283,7 +289,13 @@ async def recommendation(
             run_aggregation(assoc_names, cart_items, categories_dct, current_hr, weather),
         )
         logger.debug("aggreagation done")
-        fixed_doc = await db.find_one(FixedProduct)
+        fixed_doc = await db.find_one(
+            FixedProduct,
+            (FixedProduct.tenant_id == tenant_id) &
+            (FixedProduct.location_id == data.locationId) &
+            (FixedProduct.store_id == data.storeId)
+        )
+        logger.debug(always_doc)
         fixed_products = fixed_doc.products if fixed_doc else []
         # Choose base list and convert to UPCs
         if filtered_assoc_names:
@@ -308,7 +320,7 @@ async def recommendation(
         # merge_final_recommendations(base_upcs, fixed_products, always_products, N)
         final_upcs = merge_final_recommendations(base_upcs, fixed_products, always_products, final_top_n)
         logger.debug("final recommendation done")
-
+        logger.debug(final_upcs)
         # final_result = [{"upc": u, "name": upc_to_name.get(u, "")} for u in final_upcs]
         final_result = [{"upc": u, "name":upc_to_name.get(u, "")} for u in final_upcs if u in upc_to_name]
 

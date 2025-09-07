@@ -26,11 +26,12 @@ def initialize_backend_application() -> fastapi.FastAPI:
     app.add_event_handler("shutdown", shutdown_event())
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.ALLOWED_ORIGINS,
-        allow_credentials=settings.IS_ALLOWED_CREDENTIALS,
-        allow_methods=settings.ALLOWED_METHODS,
-        allow_headers=settings.ALLOWED_HEADERS,
+        allow_origins=["*"],       # <-- change here
+        allow_credentials=True,    # or False, depending on your need
+        allow_methods=["*"],       # <-- allow all
+        allow_headers=["*"],       # <-- allow all
     )
+
     app.add_middleware(ExceptionHandlerMiddleware)
     app.include_router(recommendation_router)
     app.include_router(user_router)

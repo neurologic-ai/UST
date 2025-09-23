@@ -22,10 +22,13 @@ from configs.manager import settings
 
 router = APIRouter(prefix="/api/v2", tags=['store'])
 
-required_fields = ["Store ID", "Store Name", "Location Id", "Location"]
+required_fields = ["Store ID", "Store Name", "Location Id", "Location", "Country","State"]
 
-def validate_store_row(row: dict) -> bool:
-    return all(row.get(field) for field in required_fields)
+# def validate_store_row(row: dict) -> bool:
+#     return all(row.get(field) for field in required_fields)
+def validate_store_row(row: dict) -> list[str]:
+    """Return list of missing/empty fields, [] if valid."""
+    return [f for f in required_fields if not row.get(f) or not row[f].strip()]
 
 
 async def parse_csv_file(file: UploadFile) -> List[dict]:
@@ -158,13 +161,30 @@ async def upload_stores_from_csv(
         if not tenant:
             raise HTTPException(status_code=404, detail="Tenant not found")
 
+        # csv_rows = await parse_csv_file(file)
+        # invalid_rows = [row for row in csv_rows if not validate_store_row(row)]
+        # if invalid_rows:
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail=f"CSV contains {len(invalid_rows)} row(s) with missing required fields: {', '.join(['Store ID', 'Store Name', 'Location Id', 'Location'])}"
+        #     )
         csv_rows = await parse_csv_file(file)
-        invalid_rows = [row for row in csv_rows if not validate_store_row(row)]
-        if invalid_rows:
+
+        errors = []
+        for i, row in enumerate(csv_rows, start=2):  # start=2, since row 1 = headers
+            missing = validate_store_row(row)
+            if missing:
+                errors.append({"row": i, "missing_fields": missing})
+
+        if errors:
             raise HTTPException(
                 status_code=400,
-                detail=f"CSV contains {len(invalid_rows)} row(s) with missing required fields: {', '.join(['Store ID', 'Store Name', 'Location Id', 'Location'])}"
+                detail={
+                    "message": f"CSV contains {len(errors)} invalid row(s).",
+                    "errors": errors
+                }
             )
+
         updated = False
         async with httpx.AsyncClient() as client:
             for row in csv_rows:

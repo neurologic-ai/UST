@@ -49,6 +49,8 @@ other_popular_collection_name = MongoDatabase()['other_popular_collection']
 
 lookup_collection = MongoDatabase()['lookup_dicts']
 category_cache_collection = MongoDatabase()["category_cache"]
+tenant_collection = MongoDatabase()['tenant_collection']
+
 
 async def create_index():
     try:
@@ -88,7 +90,15 @@ async def create_index():
              "tenant_id_1_location_id_1_store_id_1"),
              (category_cache_collection,
              [("tenant_id", 1), ("location_id", 1)],
-             "tenant_id_1_location_id_1")
+             "tenant_id_1_location_id_1"),
+             # ---------- Tenant collection unique indexes ----------
+            (tenant_collection,
+            [("normalized_name", 1)],
+            "uniq_normalized_name"),
+            (tenant_collection,
+            [("api_key", 1)],
+            "uniq_api_key"),
+
         ]
         
         for collection, index_spec, index_name in collections_with_indexes:

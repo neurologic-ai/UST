@@ -66,24 +66,32 @@ async def validate_csv_columns(file: UploadFile, required_columns: list[str]):
 
     
 async def get_categories_for_products(
-    product_names: List[str], tenant_id: str, location_id: str, db
+    product_names: List[str],
+    tenant_id: str,
+    location_id: str,
+    store_id: str,     # ✅ NEW
+    db
 ) -> Dict[str, Product]:
     """
-    Returns category metadata only for the given list of product names.
+    Returns category metadata only for the given list of product names, scoped to a single store.
     """
-    cache_filter = {"tenant_id": tenant_id, "location_id": location_id}
+    cache_filter = {
+        "tenant_id": tenant_id,
+        "location_id": location_id,
+        "store_id": store_id,   # ✅ scope by store
+    }
     cursor = db.find(CategoryCache, cache_filter)
 
-    name_set = set(p.strip() for p in product_names)
+    name_set = set(p.strip() for p in product_names if p)
     categories_dct: Dict[str, Product] = {}
 
     async for doc in cursor:
         if not doc.data:
             continue
         for name, data in doc.data.items():
-            name = name.strip()
-            if name in name_set:
-                categories_dct[name] = Product.from_dict({
+            key = name.strip()
+            if key in name_set:
+                categories_dct[key] = Product.from_dict({
                     "name": data.name,
                     "category": data.category,
                     "subcategory": data.subcategory,

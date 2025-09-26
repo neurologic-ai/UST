@@ -91,8 +91,8 @@ async def create_index():
              [("tenant_id", 1), ("location_id", 1), ("store_id", 1)],
              "tenant_id_1_location_id_1_store_id_1"),
              (category_cache_collection,
-             [("tenant_id", 1), ("location_id", 1)],
-             "tenant_id_1_location_id_1")
+             [("tenant_id", 1), ("location_id", 1), ("store_id", 1)],
+             "tenant_id_1_location_id_1_store_id_1")
         ]
         
         for collection, index_spec, index_name in collections_with_indexes:
@@ -200,7 +200,8 @@ async def delete_documents_for_tenant_location_and_store_ids(
         lunch_popular_collection_name,
         dinner_popular_collection_name,
         other_popular_collection_name,
-        lookup_collection
+        lookup_collection,
+        category_cache_collection
     ]
 
     for collection in collections:

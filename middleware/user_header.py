@@ -19,7 +19,7 @@ async def add_user_headers(request: Request, call_next):
             if user:
                 response.headers["Username-Authorities"] = user.username
                 response.headers["Username-Id"] = str(user.id)
-                response.headers["Role-Authorities"] = str(user.role)
+                response.headers["Role-Authorities"] = user.role.value
         except Exception:
             # Don’t crash the whole request on header injection failure
             pass

@@ -37,10 +37,10 @@ async def create_tenant(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if authorize.role == UserRole.TENANT_ADMIN:
+        if authorize.role in {UserRole.TENANT_ADMIN, UserRole.TENANT_OP}:
                         raise HTTPException(
                 status_code=401,
-                detail="Tenant admin can not do this Activity"
+                detail=f"{authorize.role.value} can not do this Activity"
             )
 
 
@@ -172,10 +172,10 @@ async def disable_tenant(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
-        if authorize.role == UserRole.TENANT_ADMIN:
-            raise HTTPException(
+        if authorize.role in {UserRole.TENANT_ADMIN, UserRole.TENANT_OP}:
+                        raise HTTPException(
                 status_code=401,
-                detail="Tenant admin can not do this Activity"
+                detail=f"{authorize.role.value} can not do this Activity"
             )
         if not tenantId or not ObjectId.is_valid(tenantId):
             raise HTTPException(status_code=400, detail="Invalid tenant ID")
@@ -231,10 +231,10 @@ async def list_tenants(
     db: AIOEngine = Depends(get_engine),
 ):
     try:
-        if authorize.role == UserRole.TENANT_ADMIN:
-            raise HTTPException(
+        if authorize.role in {UserRole.TENANT_ADMIN, UserRole.TENANT_OP}:
+                        raise HTTPException(
                 status_code=401,
-                detail="Tenant admin can not do this Activity"
+                detail=f"{authorize.role.value} can not do this Activity"
             )
 
         query_filter = {}

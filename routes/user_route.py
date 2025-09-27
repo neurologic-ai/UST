@@ -110,7 +110,7 @@ async def create_user(
             if not tenant:
                 raise HTTPException(status_code=400, detail="Tenant not found")
         else:
-            if authorize.role == UserRole.TENANT_ADMIN:
+            if authorize.role in {UserRole.TENANT_ADMIN, UserRole.TENANT_OP}:
                 raise HTTPException(
                     status_code=401,
                     detail="TenantId was not provided. Only UST_ADMIN can do this activity."
@@ -292,7 +292,7 @@ async def list_users(
     try:
         query_parts = []
 
-        if authorize.role == UserRole.ADMIN_UST:
+        if authorize.role in {UserRole.ADMIN_UST, UserRole.UST_SUPPORT}:
             if filters.tenantId:
                 if not ObjectId.is_valid(filters.tenantId):
                     raise HTTPException(status_code=400, detail="Invalid tenant ID")

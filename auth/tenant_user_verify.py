@@ -32,8 +32,8 @@ def check_user_role_and_status(user: User, tenant_id: str):
 async def resolve_tenants_for_read(
     db: AIOEngine, authorize: User, tenant_id_opt: Optional[str]
 ) -> List[Tenant]:
-    if authorize.role == UserRole.ADMIN_UST:
-        # Admin can read across tenants, optionally filter
+    # Global roles can read across tenants
+    if authorize.role in {UserRole.ADMIN_UST, UserRole.UST_SUPPORT}:
         if tenant_id_opt:
             if not ObjectId.is_valid(tenant_id_opt):
                 raise HTTPException(status_code=400, detail="Invalid tenant ID")
@@ -43,9 +43,9 @@ async def resolve_tenants_for_read(
             return [tenant]
         return [t async for t in db.find(Tenant, {})]
 
-    # Tenant admins → must belong to their own tenant
+    # Tenant-scoped roles → must belong to their own tenant
     tenant_id = tenant_id_opt or authorize.tenant_id
-    if not ObjectId.is_valid(tenant_id):
+    if not tenant_id or not ObjectId.is_valid(tenant_id):
         raise HTTPException(status_code=400, detail="Invalid tenant ID")
 
     check_user_role_and_status(authorize, tenant_id)

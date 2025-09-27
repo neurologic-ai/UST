@@ -1,3 +1,4 @@
+import traceback
 from loguru import logger
 from configs.manager import settings
 from motor import motor_asyncio, core
@@ -90,7 +91,7 @@ async def create_index():
              "tenant_id_1_location_id_1_store_id_1"),
              (category_cache_collection,
              [("tenant_id", 1), ("location_id", 1), ("store_id", 1)],
-             "tenant_id_1_location_id_1_store_id_1")
+             "tenant_id_1_location_id_1_store_id_1"),
              # ---------- Tenant collection unique indexes ----------
             (tenant_collection,
             [("normalized_name", 1)],
@@ -156,6 +157,7 @@ async def create_index():
         
     except Exception as e:
         logger.error(f"Error in create_index: {e}")
+        logger.debug(traceback.format_exc())
         # Don't raise the exception to prevent startup failure
         # Indexes can be created manually later if needed
 

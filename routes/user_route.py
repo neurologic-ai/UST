@@ -283,7 +283,7 @@ async def disable_user(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/users/list", response_model=List[UserResponse])
+@router.post("/users/list")
 async def list_users(
     filters: UserFilterRequest,
     authorize: User = Depends(PermissionChecker(["users:read"])),
@@ -291,6 +291,7 @@ async def list_users(
 ):
     try:
         query_parts = []
+
         if authorize.role == UserRole.ADMIN_UST:
             if filters.tenantId:
                 if not ObjectId.is_valid(filters.tenantId):
@@ -309,6 +310,12 @@ async def list_users(
                 raise HTTPException(status_code=404, detail="Tenant not found")
             query_parts.append(User.tenant_id == tenant_id)
         
+        if filters.id:
+            if not ObjectId.is_valid(filters.id):
+                raise HTTPException(status_code=400, detail="Invalid user ID")
+            query_parts.append(User.id == ObjectId(filters.id))
+
+        
         if filters.status:
             query_parts.append(User.status == filters.status)
         if filters.role:
@@ -323,10 +330,47 @@ async def list_users(
         final_query = build_nested_and(query_parts)
         users = await db.find(User, final_query)
 
-        return [UserResponse(**user.dict(exclude={'password', 'permissions'})) for user in users]
+        user_responses = [
+        UserResponse(
+            id=str(user.id),                               
+            **user.dict(exclude={'password', 'permissions', 'id'})
+        )
+        for user in users
+    ]
 
-    except HTTPException as e:
-        raise e
+        return {
+            "totalElements": len(user_responses),
+            "users": user_responses
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.debug(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/users/{user_id}")
+async def get_user(
+    user_id: str,
+    authorize: User = Depends(PermissionChecker(["users:read"])),
+    db: AIOEngine = Depends(get_engine)
+):
+    try:
+        if not ObjectId.is_valid(user_id):
+            raise HTTPException(status_code=400, detail="Invalid user ID")
+
+        user = await db.find_one(User, User.id == ObjectId(user_id))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return UserResponse(
+                id=str(user.id),                               
+                **user.dict(exclude={'password', 'permissions', 'id'})
+            )
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.debug(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

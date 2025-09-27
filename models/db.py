@@ -9,6 +9,8 @@ from enum import Enum
 class UserRole(str, Enum):
     ADMIN_UST = "ADMIN_UST"
     TENANT_ADMIN = "TENANT_ADMIN"
+    UST_SUPPORT = "UST_SUPPORT"
+    TENANT_OP = "TENANT_OP"
 
 class UserStatus(str, Enum):
     ACTIVE = "Active"

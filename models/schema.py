@@ -104,6 +104,7 @@ class UserUpdate(BaseModel):
 
 
 class UserFilterRequest(BaseModel):
+    id: Optional[str] = None 
     tenantId: Optional[str] = None
     status: Optional[UserStatus] = None
     role: Optional[UserRole] = None
@@ -133,14 +134,14 @@ class StoreDisableRequest(BaseModel):
 
 
 class StoreFilterRequest(BaseModel):
-    tenantId: str
+    tenantId: Optional[str] = None
     locationId: Optional[str] = None
     storeId: Optional[str] = None
     status: Optional[UserStatus] = None
 
 
 class LocationFilterRequest(BaseModel):
-    tenantId: str
+    tenantId: Optional[str] = None
     locationId: Optional[str] = None
     status: Optional[UserStatus] = None
 
@@ -165,6 +166,7 @@ class AddStoreRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
+    id: str  
     username: str
     role: UserRole
     name: str
@@ -177,3 +179,13 @@ class UserResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class UpdateLocationRequest(BaseModel):
+    tenantId: str
+    locationId: str
+    name: Optional[str] = None
+    status: Optional[UserStatus] = None  # reuse your existing enum
+
+class DisableLocationRequest(BaseModel):
+    tenantId: str
+    locationId: str

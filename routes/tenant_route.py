@@ -240,9 +240,8 @@ async def list_tenants(
         query_filter = {}
 
         if filters.tenantName:
-            needle = re.escape(filters.tenantName.strip())
-            query_filter["tenant_name"] = Regex(f".*{needle}.*", "i")
-
+            needle = re.escape(filters.tenantName.strip().lower())
+            query_filter["normalized_name"] = Regex(f"^{needle}") 
         if filters.status:
             query_filter["status"] = filters.status
 

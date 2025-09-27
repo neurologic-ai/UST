@@ -275,7 +275,7 @@ async def recommendation(
         popular_data_dict, popular_names = popular_result
         assoc_data_dict, assoc_names = assoc_result
         all_required_names = set(popular_names + assoc_names + cart_items)
-        categories_dct = await get_categories_for_products(list(all_required_names), tenant_id, data.locationId, db)
+        categories_dct = await get_categories_for_products(list(all_required_names), tenant_id, data.locationId,data.storeId, db)
         logger.debug("Category obtained")
 
         # ✅ Define helper function locally

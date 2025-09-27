@@ -11,6 +11,8 @@ breakfast_popular_collection_name, lunch_popular_collection_name, \
 dinner_popular_collection_name, other_popular_collection_name, \
 breakfast_association_collection_name, lunch_association_collection_name, \
 dinner_association_collection_name, other_association_collection_name, lookup_collection
+from typing import Dict, Any
+from pymongo.errors import DuplicateKeyError
 
 def build_lookup_dicts(df):
     df['UPC'] = df['UPC'].astype(str)
@@ -18,37 +20,50 @@ def build_lookup_dicts(df):
     upc_to_name = dict(zip(df['UPC'], df['Product_name']))
     return name_to_upc, upc_to_name
 
-async def save_lookup_dicts(tenant_id: str, location_id: str, store_id: str, name_to_upc: dict, upc_to_name: dict):
-    try:
-        # Fetch existing doc
-        existing = await lookup_collection.find_one(
-            {"tenant_id": tenant_id, "location_id": location_id, "store_id": store_id}
-        ) or {}
+async def save_lookup_dicts(
+    tenant_id: str,
+    location_id: str,
+    store_id: str,
+    name_to_upc: Dict[Any, Any],
+    upc_to_name: Dict[Any, Any],
+):
+    # Build per-key $set so the merge happens server-side atomically
+    set_fields: Dict[str, Any] = {}
 
-        # Merge into existing
-        merged_name_to_upc = {**existing.get("name_to_upc", {}), **name_to_upc}
-        merged_upc_to_name = {**existing.get("upc_to_name", {}), **upc_to_name}
+    # Merge into upc_to_name subdocument
+    for upc, name in dict(upc_to_name).items():
+        set_fields[f"upc_to_name.{upc}"] = name
 
-        # Build merged doc
-        lookup_doc = {
+    # Merge into name_to_upc subdocument
+    for name, upc in dict(name_to_upc).items():
+        set_fields[f"name_to_upc.{name}"] = upc
+
+    if not set_fields:
+        return  # nothing to write
+
+    filt = {
+        "tenant_id": tenant_id,
+        "location_id": location_id,
+        "store_id": store_id,
+    }
+
+    update_doc = {
+        # Written only if the document is newly inserted (first time seen)
+        "$setOnInsert": {
             "tenant_id": tenant_id,
             "location_id": location_id,
             "store_id": store_id,
-            "name_to_upc": merged_name_to_upc,
-            "upc_to_name": merged_upc_to_name
-        }
+        },
+        # Merge/overwrite just the provided keys; others remain untouched
+        "$set": set_fields,
+    }
 
-        # Upsert with full merged doc
-        await lookup_collection.update_one(
-            {"tenant_id": tenant_id, "location_id": location_id, "store_id": store_id},
-            {"$set": lookup_doc},
-            upsert=True
-        )
-
-    except Exception as e:
-        logger.debug("❌ Failed to merge lookup_collection")
-        logger.debug(traceback.format_exc())
-        raise
+    try:
+        # Classic update document (dict), compatible with Amazon DocumentDB
+        await lookup_collection.update_one(filt, update_doc, upsert=True)
+    except DuplicateKeyError:
+        # Another writer inserted first; merge without upsert
+        await lookup_collection.update_one(filt, {"$set": set_fields}, upsert=False)
 
 
 

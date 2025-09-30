@@ -37,3 +37,4 @@ weather
 user.json
 locustfile.py
 test.py
+global-bundle.pem

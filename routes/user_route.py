@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from loguru import logger
 from odmantic import AIOEngine
 from auth.tenant_user_verify import check_user_role_and_status
-from models.schema import LoginData, PyUser, Token, UserCreate, UserFilterRequest, UserResponse, UserUpdate
+from models.schema import LoginData, LoginResponse, PyUser, Token, UserCreate, UserFilterRequest, UserResponse, UserUpdate
 from models.db import Tenant, User, UserRole, UserStatus
 from db.singleton import get_engine
 from repos.user_repos import build_nested_and
@@ -88,11 +88,16 @@ def create_token(user: User) -> str:
 async def login(
     login_data:  LoginData,
     db: AIOEngine = Depends(get_engine),
-) -> Token:
+) -> LoginResponse:
     user = await authenticate_user(db,login_data.username,login_data.password)
     token_str = create_token(user)
-    token = Token(access_token=token_str, token_type='bearer')
-    return token
+    response = LoginResponse(
+        access_token=token_str,
+        token_type='bearer',
+        role=user.role.value,
+        tenantId=user.tenant_id
+    )
+    return response
 
 @router.post('/users/create')
 async def create_user(

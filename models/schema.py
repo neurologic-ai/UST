@@ -39,6 +39,11 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class LoginResponse(Token):
+    role: str
+    tenantId: Optional[str]
+
+
 def to_serializable(doc):
     """Convert MongoDB ObjectId to string."""
     if isinstance(doc, ObjectId):

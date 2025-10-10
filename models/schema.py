@@ -1,6 +1,6 @@
 from datetime import datetime
 import uuid
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import Dict, List, Optional
 from bson import ObjectId
 from typing import Any
@@ -29,7 +29,16 @@ class UserCreate(UserBase):
     password: str
     role: UserRole
     name: str
+    email: Optional[EmailStr] = None
     tenantId: Optional[str] = None
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def validate_email(cls, v):
+        # Convert empty strings to None
+        if v is not None and isinstance(v, str) and v.strip() == '':
+            return None
+        return v
 
 class PyUser(UserBase):
     id: Any
@@ -104,8 +113,17 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[UserRole] = None
     name: Optional[str] = None
+    email: Optional[EmailStr] = None
     tenantId: Optional[str] = None
     status: Optional[UserStatus] = None
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def validate_email(cls, v):
+        # Convert empty strings to None
+        if v is not None and isinstance(v, str) and v.strip() == '':
+            return None
+        return v
 
 
 class UserFilterRequest(BaseModel):
@@ -175,8 +193,10 @@ class UserResponse(BaseModel):
     username: str
     role: UserRole
     name: str
+    email: Optional[EmailStr] = None
     status: UserStatus
     tenant_id: Optional[str] = None
+    tenant_name: Optional[str] = None
     created_at: datetime
     created_by: Optional[str] = None
     updated_at: Optional[datetime] = None

@@ -100,10 +100,11 @@ async def get_lat_lon(location: str, state: str, country: str, client: httpx.Asy
     logger.warning(f"[Geocode] All attempts failed for location='{location}', state='{state}', country='{country}'")
     return None, None
 
-async def process_row(row: dict, tenant: Tenant, client: httpx.AsyncClient) -> bool:
+async def process_row(row: dict, tenant: Tenant, client: httpx.AsyncClient, user_id: str) -> bool:
     try:
-        if not validate_store_row(row):
-            logger.warning(f"Missing required fields in row: {row}")
+        missing_fields = validate_store_row(row)
+        if missing_fields:
+            logger.warning(f"Missing required fields in row {row}: {missing_fields}")
             return False
 
         location_id = row["Location Id"].strip()
@@ -122,7 +123,9 @@ async def process_row(row: dict, tenant: Tenant, client: httpx.AsyncClient) -> b
             state=state,
             country=country,
             lat=lat,
-            lon=lon
+            lon=lon,
+            created_at=datetime.utcnow(),
+            created_by=user_id
         )
 
         location = next((loc for loc in tenant.locations if loc.location_id == location_id), None)
@@ -135,7 +138,9 @@ async def process_row(row: dict, tenant: Tenant, client: httpx.AsyncClient) -> b
                 location_id=location_id,
                 name=location_name,
                 status=UserStatus.ACTIVE,
-                stores=[store_data]
+                stores=[store_data],
+                created_at=datetime.utcnow(),
+                created_by=user_id
             ))
             return True
 
@@ -188,7 +193,7 @@ async def upload_stores_from_csv(
         updated = False
         async with httpx.AsyncClient() as client:
             for row in csv_rows:
-                changed = await process_row(row, tenant, client)
+                changed = await process_row(row, tenant, client, str(authorize.id))
                 if changed:
                     updated = True
 
@@ -268,6 +273,9 @@ async def edit_store(
         if not updated:
             raise HTTPException(status_code=400, detail="No fields provided to update")
 
+        store.updated_at = datetime.utcnow()
+        store.updated_by = str(authorize.id)
+
         await db.save(tenant)
 
         return {"message": "Store updated successfully"}
@@ -298,6 +306,8 @@ async def disable_store(data: StoreDisableRequest, authorize: User = Depends(Per
                         if store.status == UserStatus.INACTIVE:
                             return {"message": "Store is already inactive"}
                         store.status = UserStatus.INACTIVE
+                        store.updated_at = datetime.utcnow()
+                        store.updated_by = str(authorize.id)
                         tenant.updated_at = datetime.utcnow()
                         tenant.updated_by = str(authorize.id)
                         await db.save(tenant)
@@ -480,7 +490,9 @@ async def add_location(
             location_id=data.locationId,
             name=data.name,
             status=data.status,
-            stores=[]
+            stores=[],
+            created_at=datetime.utcnow(),
+            created_by=str(authorize.id)
         ))
 
         await db.save(tenant)
@@ -547,7 +559,9 @@ async def add_store(
             state=data.state,
             country=data.country,
             lat=lat,
-            lon=lon
+            lon=lon,
+            created_at=datetime.utcnow(),
+            created_by=str(authorize.id)
         ))
 
         await db.save(tenant)
@@ -595,6 +609,8 @@ async def edit_location(
         if not updated:
             raise HTTPException(status_code=400, detail="No fields provided to update")
 
+        location.updated_at = datetime.utcnow()
+        location.updated_by = str(authorize.id)
         tenant.updated_at = datetime.utcnow()
         tenant.updated_by = str(authorize.id)
         await db.save(tenant)
@@ -632,6 +648,8 @@ async def disable_location(
             return {"message": "Location is already inactive"}
 
         location.status = UserStatus.INACTIVE
+        location.updated_at = datetime.utcnow()
+        location.updated_by = str(authorize.id)
         tenant.updated_at = datetime.utcnow()
         tenant.updated_by = str(authorize.id)
 

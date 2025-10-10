@@ -2,7 +2,7 @@ from datetime import datetime
 from odmantic import EmbeddedModel, Model, Field
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from enum import Enum
 
@@ -24,6 +24,7 @@ class User(Model):  # or Document if you're using Beanie
 
     role: UserRole
     name: str
+    email: Optional[EmailStr] = None
     status: UserStatus = UserStatus.ACTIVE
     tenant_id: Optional[str] = None
 
@@ -139,6 +140,10 @@ class Store(EmbeddedModel):
     country: Optional[str] = None
     lat: Optional[float] = None
     lon: Optional[float] = None
+    created_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    updated_at: Optional[datetime] = None
+    updated_by: Optional[str] = None
 
 
 class Location(EmbeddedModel):
@@ -146,6 +151,10 @@ class Location(EmbeddedModel):
     name: str
     status: UserStatus = UserStatus.ACTIVE
     stores: List[Store] = []
+    created_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    updated_at: Optional[datetime] = None
+    updated_by: Optional[str] = None
 
 
 class Tenant(Model):

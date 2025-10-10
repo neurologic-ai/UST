@@ -157,6 +157,7 @@ async def create_user(
             permissions=['items:read', 'items:write', 'users:read', 'users:write'],
             role=user.role,
             name=user.name,
+            email=user.email,
             tenant_id=tenant_id,
             created_at=datetime.datetime.utcnow(),
             created_by=str(authorize.id)
@@ -222,6 +223,8 @@ async def edit_user(
             if not re.fullmatch(r"[A-Za-z ]+", user_update.name):
                 raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
             existing_user.name = user_update.name
+        if user_update.email is not None:
+            existing_user.email = user_update.email
         if user_update.tenantId is not None:  # This handles null from JSON
             tenant_id = user_update.tenantId.strip()
             if tenant_id:  # Handles empty strings like "" or "   "
@@ -335,13 +338,19 @@ async def list_users(
         final_query = build_nested_and(query_parts)
         users = await db.find(User, final_query)
 
-        user_responses = [
-        UserResponse(
-            id=str(user.id),                               
-            **user.dict(exclude={'password', 'permissions', 'id'})
-        )
-        for user in users
-    ]
+        user_responses = []
+        for user in users:
+            tenant_name = None
+            if user.tenant_id and ObjectId.is_valid(user.tenant_id):
+                tenant = await db.find_one(Tenant, Tenant.id == ObjectId(user.tenant_id))
+                if tenant:
+                    tenant_name = tenant.tenant_name
+            
+            user_responses.append(UserResponse(
+                id=str(user.id),
+                tenant_name=tenant_name,
+                **user.dict(exclude={'password', 'permissions', 'id'})
+            ))
 
         return {
             "totalElements": len(user_responses),
@@ -369,8 +378,15 @@ async def get_user(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
+        tenant_name = None
+        if user.tenant_id and ObjectId.is_valid(user.tenant_id):
+            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(user.tenant_id))
+            if tenant:
+                tenant_name = tenant.tenant_name
+
         return UserResponse(
-                id=str(user.id),                               
+                id=str(user.id),
+                tenant_name=tenant_name,
                 **user.dict(exclude={'password', 'permissions', 'id'})
             )
 

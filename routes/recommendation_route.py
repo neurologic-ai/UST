@@ -18,6 +18,7 @@ from repos.reco_repos import get_categories_for_products, get_categories_from_ca
 from routes.user_route import PermissionChecker
 from utils.file_upload import upload_file_to_s3
 from utils.helper import get_association_recommendations, get_popular_recommendation
+from utils.error_codes import UPLOAD_ERRORS
 from configs.constant import TIME_SLOTS
 from setup import run_models_and_store_outputs
 from fastapi import UploadFile, File
@@ -34,7 +35,9 @@ import json
 import zipfile
 import io
 import base64
+import re  # NEW
 
+SCI_NOTATION_RE = re.compile(r"^[+-]?\d+(\.\d+)?[eE][+-]?\d+$")
 
 
 def normalize_key(name: str) -> str:
@@ -107,20 +110,42 @@ async def upload_csvs(
         start_time = time.perf_counter()
 
         store_ids_in_location = {store.store_id for store in location.stores}
-        uploaded_store_ids = set()
-        uploaded_location_ids = set()
+        uploaded_store_ids: set[str] = set()
+        uploaded_location_ids: set[str] = set()
 
+
+        # Simplified validation: only check columns, UPC format, and location/store IDs
         for chunk in pd.read_csv(
             processed.file,
-            usecols=["store_id", "location_id"],
+            usecols=REQUIRED_COLUMNS,
             chunksize=100_000,
-            dtype={"store_id": str, "location_id": str}
+            dtype={c: str for c in REQUIRED_COLUMNS},
+            keep_default_na=False,
+            na_filter=False,
+            engine="c",
+            low_memory=True,
         ):
-            uploaded_store_ids.update(chunk["store_id"].dropna().unique().tolist())
-            uploaded_location_ids.update(chunk["location_id"].dropna().unique().tolist())
+            # Check for scientific notation in UPC column
+            sci_mask = chunk["UPC"].str.match(SCI_NOTATION_RE, na=False)
+            if sci_mask.any():
+                example = chunk.loc[sci_mask, "UPC"].iloc[0]
+                error_detail = UPLOAD_ERRORS["SCIENTIFIC_NOTATION_UPC"].copy()
+                error_detail["affected_upcs"] = [example]
+                error_detail["solution"] = (
+                    "Format UPC column as TEXT before exporting to CSV. "
+                    "Excel: Select UPC column → Format Cells → Text → re-enter/re-import values → Save as CSV"
+                )
+                raise HTTPException(status_code=400, detail=error_detail)
 
+            # Collect store/location IDs for validation
+            chunk_store_ids = set(chunk["store_id"].dropna().unique().tolist())
+            chunk_location_ids = set(chunk["location_id"].dropna().unique().tolist())
+
+            uploaded_store_ids.update(chunk_store_ids)
+            uploaded_location_ids.update(chunk_location_ids)
+
+        # Validate store/location IDs after processing all chunks
         invalid_store_ids = [sid for sid in uploaded_store_ids if sid not in store_ids_in_location]
-
         invalid_location_ids = uploaded_location_ids - {locationId}  
 
         error_messages = []
@@ -146,7 +171,7 @@ async def upload_csvs(
             await delete_documents_for_tenant_location_and_store_ids(tenantId, locationId, list(uploaded_store_ids))
             CHUNK_SIZE = 10000
             # Step 1: Read both files into pandas DataFrames
-            df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str})
+            df_processed_chunks = pd.read_csv(processed.file, chunksize=CHUNK_SIZE, usecols=REQUIRED_COLUMNS, dtype={"UPC": str, "store_id": str, "location_id": str})
             all_tasks = [
                 process_chunk(df_processed, tenantId, locationId)
                 for df_processed in df_processed_chunks
@@ -206,7 +231,17 @@ async def recommendation(
             (AlwaysRecommendProduct.store_id == data.storeId)
         )
         logger.debug(always_doc)
-        always_products = always_doc.products if always_doc else []
+        
+        # Deduplicate always_products (keep first occurrence of each UPC)
+        always_products_raw = always_doc.products if always_doc else []
+        seen_upcs = set()
+        always_products = []
+        for ap in always_products_raw:
+            upc = str(ap.get("UPC", "")).strip()
+            if upc and upc not in seen_upcs:
+                always_products.append(ap)
+                seen_upcs.add(upc)
+        
         always_upcs = [ap["UPC"] for ap in always_products]
 
         # === If Always alone is enough ===
@@ -295,8 +330,18 @@ async def recommendation(
             (FixedProduct.location_id == data.locationId) &
             (FixedProduct.store_id == data.storeId)
         )
-        logger.debug(always_doc)
-        fixed_products = fixed_doc.products if fixed_doc else []
+        logger.debug(fixed_doc)
+        
+        # Deduplicate fixed_products (keep first occurrence of each UPC)
+        fixed_products_raw = fixed_doc.products if fixed_doc else []
+        seen_fixed_upcs = set()
+        fixed_products = []
+        for fp in fixed_products_raw:
+            upc = str(fp.get("UPC", "")).strip()
+            if upc and upc not in seen_fixed_upcs:
+                fixed_products.append(fp)
+                seen_fixed_upcs.add(upc)
+        
         # Choose base list and convert to UPCs
         if filtered_assoc_names:
             base_names = filtered_assoc_names
@@ -304,25 +349,26 @@ async def recommendation(
         else:
             base_names = filtered_popular_names
             base_upcs = [popular_data_dict[n].upc for n in base_names if n in popular_data_dict]
-        # Build small maps
-        always_map = {str(ap["UPC"]).strip(): (ap.get("Product Name") or "").strip()
-                    for ap in always_products if ap.get("UPC")}
-        fixed_map  = {str(fp["UPC"]).strip(): (fp.get("Product Name") or "").strip()
-                    for fp in fixed_products  if fp.get("UPC")}
-        logger.debug(base_upcs)
-        logger.debug(fixed_map)
-        logger.debug(always_map)
-        # Merge into the existing upc_to_name (overwrites if key already exists)
-        upc_to_name.update(fixed_map)
-        upc_to_name.update(always_map)
+        
+        logger.debug(f"Base UPCs: {base_upcs}")
+        logger.debug(f"Fixed products count: {len(fixed_products)}")
+        logger.debug(f"Always products count: {len(always_products)}")
+        # Note: Product names now come from lookup dict (single source of truth)
+        # No need to update upc_to_name map - it's already loaded from the lookup dict
 
         # ---------- Merge with Fixed & Always (store-scoped) ----------
         # merge_final_recommendations(base_upcs, fixed_products, always_products, N)
         final_upcs = merge_final_recommendations(base_upcs, fixed_products, always_products, final_top_n)
         logger.debug("final recommendation done")
         logger.debug(final_upcs)
-        # final_result = [{"upc": u, "name": upc_to_name.get(u, "")} for u in final_upcs]
-        final_result = [{"upc": u, "name":upc_to_name.get(u, "")} for u in final_upcs if u in upc_to_name]
+        
+        # Build final result ensuring no duplicates and all UPCs exist in the map
+        seen_result_upcs = set()
+        final_result = []
+        for u in final_upcs:
+            if u in upc_to_name and u not in seen_result_upcs:
+                final_result.append({"upc": u, "name": upc_to_name.get(u, "")})
+                seen_result_upcs.add(u)
 
         return {
             "message": "Final Recommendation",

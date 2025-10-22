@@ -6,7 +6,7 @@ from db.singleton import get_engine
 from initialize.helper import load_lookup_dicts
 from models.db import Tenant
 from models.fixed_always_reco import AlwaysRecommendProduct, FixedProduct, ProductType
-from repos.fixed_always_product import parse_upload, validate_df
+from repos.fixed_always_product import parse_upload, validate_df, check_duplicates
 from routes.user_route import PermissionChecker
 from utils.error_codes import UPLOAD_ERRORS, UPLOAD_SUCCESS
 
@@ -46,27 +46,45 @@ async def upload_products(
     store = next((s for s in location.stores if s.store_id == storeId), None)
     if not store:
         raise HTTPException(status_code=400, detail=f"Invalid store_id: {storeId}")
-    # 1️ Parse + validate
+    # 1️ Parse + validate (UPC is already normalized in parse_upload)
     df = await parse_upload(file)
     await validate_df(df)
 
-    # 2️ Clean
-    df["UPC"] = df["UPC"].astype(str).str.strip()
+    # 2️ Clean product names
     df["Product Name"] = df["Product Name"].astype(str).str.strip()
+    
+    # 3️ Check for duplicates (after cleaning)
+    duplicate_issues = await check_duplicates(df)
+    if duplicate_issues:
+        error_details = UPLOAD_ERRORS["DUPLICATE_DATA"].copy()
+        
+        if "duplicate_upcs" in duplicate_issues:
+            error_details["duplicate_upcs"] = duplicate_issues["duplicate_upcs"]
+            error_details["duplicate_upcs_message"] = "Same UPC found with different product names. Please fix these entries."
+        
+        if "duplicate_names" in duplicate_issues:
+            error_details["duplicate_names"] = duplicate_issues["duplicate_names"]
+            error_details["duplicate_names_message"] = "Same product name found with different UPCs. Please verify if this is intentional."
+        
+        raise HTTPException(status_code=400, detail=error_details)
+    
+    # 3a️ Remove exact duplicates (same UPC + same name)
+    df = df.drop_duplicates(subset=["UPC", "Product Name"], keep="first")
 
-    # 3️ Load your UPC lookup map
+    # 4️ Load your UPC lookup map
     _, upc_to_name_map = await load_lookup_dicts(tenantId, locationId, storeId)
 
-    # 4️ Filter valid vs invalid
+    # 5️ Filter valid vs invalid (use Product Names from lookup dict for consistency)
     valid_products = []
     skipped_upcs = []
 
     for _, row in df.iterrows():
         upc = row["UPC"]
         if upc in upc_to_name_map:
+            # Use the product name from lookup dict (single source of truth)
             valid_products.append({
                 "UPC": upc,
-                "Product Name": row["Product Name"]
+                "Product Name": upc_to_name_map[upc]
             })
         else:
             skipped_upcs.append(upc)
@@ -76,7 +94,7 @@ async def upload_products(
 
     now = datetime.utcnow()
 
-    # 5️ Save only valid ones
+    # 6️ Save only valid ones
     if productType == ProductType.fixed:
         config = await db.find_one(
             FixedProduct,

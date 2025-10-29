@@ -51,6 +51,7 @@ other_popular_collection_name = MongoDatabase()['other_popular_collection']
 lookup_collection = MongoDatabase()['lookup_dicts']
 category_cache_collection = MongoDatabase()["category_cache"]
 tenant_collection = MongoDatabase()['tenant_collection']
+user_collection = MongoDatabase()['user_collection']
 
 
 async def create_index():
@@ -99,6 +100,9 @@ async def create_index():
             (tenant_collection,
             [("api_key", 1)],
             "uniq_api_key"),
+            (user_collection,
+            [("username_norm", 1)],
+            "uniq_username"),
 
         ]
         

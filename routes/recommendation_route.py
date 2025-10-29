@@ -202,6 +202,14 @@ async def recommendation(
     tenant: Tenant = Depends(get_current_tenant)
     ):
     try:
+        logger.debug(
+            f"Inputs → hour: {data.currentHour}, "
+            f"cartItems: {data.cartItems}, "
+            f"topN: {data.topN}, "
+            f"locationId: {data.locationId}, "
+            f"storeId: {data.storeId}"
+        )
+
         current_hr = data.currentHour
         current_datetime = datetime.utcnow()
         tenant_id = str(tenant.id)

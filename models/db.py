@@ -17,8 +17,9 @@ class UserStatus(str, Enum):
     INACTIVE = "Inactive"
 
 
-class User(Model):  # or Document if you're using Beanie
+class User(Model):
     username: str
+    username_norm: str
     password: str
     permissions: List[str] = []
 

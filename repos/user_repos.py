@@ -7,3 +7,7 @@ def build_nested_and(conditions):
     if len(conditions) == 1:
         return conditions[0]
     return reduce(lambda a, b: and_(a, b), conditions)
+
+def normalize_username(u: str) -> str:
+    return u.strip().casefold()
+

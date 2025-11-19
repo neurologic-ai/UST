@@ -13,10 +13,14 @@ from fastapi.testclient import TestClient
 from loguru import logger
 from odmantic import AIOEngine
 from auth.tenant_user_verify import check_user_role_and_status
-from models.schema import LoginData, PyUser, Token, UserCreate, UserFilterRequest, UserResponse, UserUpdate
+from models.schema import LoginData, LoginResponse, PyUser, Token, UserCreate, UserFilterRequest, UserResponse, UserUpdate
 from models.db import Tenant, User, UserRole, UserStatus
 from db.singleton import get_engine
-from repos.user_repos import build_nested_and
+from repos.user_repos import build_nested_and, normalize_username
+from pymongo.errors import DuplicateKeyError
+
+
+
 
 router = APIRouter(
     prefix="/api/v2",
@@ -30,12 +34,13 @@ oauth_scheme = OAuth2PasswordBearer(
 
 
 
-async def authenticate_user(db: AIOEngine, username: str, password: str) -> PyUser:
+async def authenticate_user(db: AIOEngine, username: str, password: str) -> User:
     exception = HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail='Invalid credentials'
                 )
-    user = await db.find_one(User,User.username == username)
+    uname = normalize_username(username)
+    user = await db.find_one(User, User.username_norm == uname)
     if user:
         if user.status != UserStatus.ACTIVE:
             raise HTTPException(
@@ -48,13 +53,15 @@ async def authenticate_user(db: AIOEngine, username: str, password: str) -> PyUs
 
     raise exception
 
+
 async def get_current_user(
     db: AIOEngine = Depends(get_engine),     
     token: str = Depends(oauth_scheme)
 ) -> User:
     decoded = jwt.decode(token, 'secret',algorithms=['HS256'])
     username = decoded['sub']
-    user = await db.find_one(User,User.username == username)
+    username_norm = normalize_username(username)
+    user = await db.find_one(User, User.username_norm == username_norm)
     if user:        
         return user
     raise HTTPException(
@@ -67,7 +74,7 @@ class PermissionChecker:
     def __init__(self, required_permissions: list[str]) -> None:
         self.required_permissions = required_permissions
 
-    def __call__(self, user: User = Depends(get_current_user)) -> bool:
+    def __call__(self, user: User = Depends(get_current_user)) -> User:
         for r_perm in self.required_permissions:
             if r_perm not in user.permissions:
                 raise HTTPException(
@@ -88,11 +95,16 @@ def create_token(user: User) -> str:
 async def login(
     login_data:  LoginData,
     db: AIOEngine = Depends(get_engine),
-) -> Token:
+) -> LoginResponse:
     user = await authenticate_user(db,login_data.username,login_data.password)
     token_str = create_token(user)
-    token = Token(access_token=token_str, token_type='bearer')
-    return token
+    response = LoginResponse(
+        access_token=token_str,
+        token_type='bearer',
+        role=user.role.value,
+        tenantId=user.tenant_id
+    )
+    return response
 
 @router.post('/users/create')
 async def create_user(
@@ -101,6 +113,8 @@ async def create_user(
     db: AIOEngine = Depends(get_engine)
 ):
     try:
+        # --- normalize early
+        username_norm = normalize_username(user.username)
         tenant_id = user.tenantId.strip() if user.tenantId and user.tenantId.strip() else None
         if tenant_id:
             if not ObjectId.is_valid(tenant_id):
@@ -110,12 +124,12 @@ async def create_user(
             if not tenant:
                 raise HTTPException(status_code=400, detail="Tenant not found")
         else:
-            if authorize.role == UserRole.TENANT_ADMIN:
+            if authorize.role in {UserRole.TENANT_ADMIN, UserRole.TENANT_OP}:
                 raise HTTPException(
                     status_code=401,
                     detail="TenantId was not provided. Only UST_ADMIN can do this activity."
                 )
-        if not user.username.strip():
+        if not username_norm:
             raise HTTPException(status_code=400, detail="Username cannot be empty")
 
         if not user.password.strip():
@@ -128,36 +142,32 @@ async def create_user(
             raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
 
         # Check if username already exists (optional but safe)
-        existing_user = await db.find_one(User, User.username == user.username)
+        existing_user = await db.find_one(User, User.username_norm == username_norm)
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already exists")
-        tenant_id = user.tenantId.strip() if user.tenantId and user.tenantId.strip() else None
-
-        if tenant_id:
-            if not ObjectId.is_valid(tenant_id):
-                raise HTTPException(status_code=400, detail="Invalid tenant ID")
-            check_user_role_and_status(authorize, tenant_id)
-            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(tenant_id))
-            if not tenant:
-                raise HTTPException(status_code=400, detail="Tenant not found")
-
-
+   
         # Hash the password and convert bytes to str
         hashed_password = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode()
 
         # Create User instance
         new_user = User(
             username=user.username,
+            username_norm=username_norm,
             password=hashed_password,
             permissions=['items:read', 'items:write', 'users:read', 'users:write'],
             role=user.role,
             name=user.name,
+            email=user.email,
             tenant_id=tenant_id,
             created_at=datetime.datetime.utcnow(),
             created_by=str(authorize.id)
         )
 
-        await db.save(new_user)
+        try:
+            await db.save(new_user)  # will raise DuplicateKeyError if index is violated
+        except DuplicateKeyError:
+            raise HTTPException(status_code=400, detail="Username already exists")
+
         return {"message": "User created successfully", "username": new_user.username}
     except HTTPException as e:
         raise e
@@ -196,7 +206,8 @@ async def edit_user(
         if not user_update.username:
             raise HTTPException(status_code=400, detail="Username is required")
 
-        existing_user = await db.find_one(User, User.username == user_update.username)
+        username_norm = normalize_username(user_update.username)
+        existing_user = await db.find_one(User, User.username_norm == username_norm)
 
         if not existing_user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -217,6 +228,8 @@ async def edit_user(
             if not re.fullmatch(r"[A-Za-z ]+", user_update.name):
                 raise HTTPException(status_code=400, detail="Name must contain only letters and spaces")
             existing_user.name = user_update.name
+        if user_update.email is not None:
+            existing_user.email = user_update.email
         if user_update.tenantId is not None:  # This handles null from JSON
             tenant_id = user_update.tenantId.strip()
             if tenant_id:  # Handles empty strings like "" or "   "
@@ -261,7 +274,8 @@ async def disable_user(
         if not username.strip():
             raise HTTPException(status_code=400, detail="Username is required")
 
-        user = await db.find_one(User, User.username == username)
+        username_norm = normalize_username(username)
+        user = await db.find_one(User, User.username_norm == username_norm)
 
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -283,7 +297,7 @@ async def disable_user(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/users/list", response_model=List[UserResponse])
+@router.post("/users/list")
 async def list_users(
     filters: UserFilterRequest,
     authorize: User = Depends(PermissionChecker(["users:read"])),
@@ -291,7 +305,8 @@ async def list_users(
 ):
     try:
         query_parts = []
-        if authorize.role == UserRole.ADMIN_UST:
+
+        if authorize.role in {UserRole.ADMIN_UST, UserRole.UST_SUPPORT}:
             if filters.tenantId:
                 if not ObjectId.is_valid(filters.tenantId):
                     raise HTTPException(status_code=400, detail="Invalid tenant ID")
@@ -309,6 +324,12 @@ async def list_users(
                 raise HTTPException(status_code=404, detail="Tenant not found")
             query_parts.append(User.tenant_id == tenant_id)
         
+        if filters.id:
+            if not ObjectId.is_valid(filters.id):
+                raise HTTPException(status_code=400, detail="Invalid user ID")
+            query_parts.append(User.id == ObjectId(filters.id))
+
+        
         if filters.status:
             query_parts.append(User.status == filters.status)
         if filters.role:
@@ -318,15 +339,66 @@ async def list_users(
             query_parts.append({"name": Regex(f".*{filters.name}.*", "i")})
 
         if filters.username:
-            query_parts.append({"username": Regex(f".*{filters.username}.*", "i")})
+            username_norm = normalize_username(filters.username)
+            query_parts.append({"username_norm": Regex(f".*{username_norm}.*", "i")})
 
         final_query = build_nested_and(query_parts)
         users = await db.find(User, final_query)
 
-        return [UserResponse(**user.dict(exclude={'password', 'permissions'})) for user in users]
+        user_responses = []
+        for user in users:
+            tenant_name = None
+            if user.tenant_id and ObjectId.is_valid(user.tenant_id):
+                tenant = await db.find_one(Tenant, Tenant.id == ObjectId(user.tenant_id))
+                if tenant:
+                    tenant_name = tenant.tenant_name
+            
+            user_responses.append(UserResponse(
+                id=str(user.id),
+                tenant_name=tenant_name,
+                **user.dict(exclude={'password', 'permissions', 'id'})
+            ))
 
-    except HTTPException as e:
-        raise e
+        return {
+            "totalElements": len(user_responses),
+            "users": user_responses
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.debug(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/users/{user_id}")
+async def get_user(
+    user_id: str,
+    authorize: User = Depends(PermissionChecker(["users:read"])),
+    db: AIOEngine = Depends(get_engine)
+):
+    try:
+        if not ObjectId.is_valid(user_id):
+            raise HTTPException(status_code=400, detail="Invalid user ID")
+
+        user = await db.find_one(User, User.id == ObjectId(user_id))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        tenant_name = None
+        if user.tenant_id and ObjectId.is_valid(user.tenant_id):
+            tenant = await db.find_one(Tenant, Tenant.id == ObjectId(user.tenant_id))
+            if tenant:
+                tenant_name = tenant.tenant_name
+
+        return UserResponse(
+                id=str(user.id),
+                tenant_name=tenant_name,
+                **user.dict(exclude={'password', 'permissions', 'id'})
+            )
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.debug(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

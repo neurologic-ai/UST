@@ -14,11 +14,12 @@ def startup_event() :
             
             # Create a admin user if the user collection is empty
             db = get_engine()
-            admin_user = await db.find_one(User, User.username == "admin")
+            admin_user = await db.find_one(User, User.username_norm == "admin")
             if not admin_user:
                 logger.info("Creating Admin user...")
                 default_user = User(
                     username="admin",
+                    username_norm="admin",
                     password=bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode(),  # decode for str
                     permissions=['items:read', 'items:write', 'users:read', 'users:write'],
                     role=UserRole.ADMIN_UST,

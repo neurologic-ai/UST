@@ -1,12 +1,15 @@
 from io import BytesIO
 import random
 import itertools
+import re
 from fastapi import HTTPException, UploadFile
 import pandas as pd
 from typing import List, Set
 from models.fixed_always_reco import AlwaysRecommendProduct, FixedProduct
 from utils.error_codes import UPLOAD_ERRORS
 
+# Scientific notation regex (consistent with CSV upload)
+SCI_NOTATION_RE = re.compile(r"^[+-]?\d+(\.\d+)?[eE][+-]?\d+$")
 
 REQUIRED_COLUMNS = ["UPC", "Product Name"]
 
@@ -14,11 +17,24 @@ REQUIRED_COLUMNS = ["UPC", "Product Name"]
 async def parse_upload(file: UploadFile) -> pd.DataFrame:
     contents = await file.read()
     if file.filename.endswith(".csv"):
-        df = pd.read_csv(BytesIO(contents))
+        df = pd.read_csv(BytesIO(contents), dtype={"UPC": str})
     elif file.filename.endswith(".xlsx"):
-        df = pd.read_excel(BytesIO(contents))
+        df = pd.read_excel(BytesIO(contents), dtype={"UPC": str})
     else:
         raise HTTPException(status_code=400, detail=UPLOAD_ERRORS["INVALID_FILE_TYPE"])
+    
+    # Check for scientific notation in UPC column (return all affected UPCs)
+    sci_mask = df["UPC"].str.match(SCI_NOTATION_RE, na=False)
+    if sci_mask.any():
+        bad_upcs = df.loc[sci_mask, "UPC"].tolist()
+        error_detail = UPLOAD_ERRORS["SCIENTIFIC_NOTATION_UPC"].copy()
+        error_detail["affected_upcs"] = bad_upcs
+        error_detail["total_affected"] = len(bad_upcs)
+        error_detail["solution"] = (
+            "Format UPC column as TEXT before exporting to CSV. "
+            "Excel: Select UPC column → Format Cells → Text → re-enter/re-import values → Save as CSV"
+        )
+        raise HTTPException(status_code=400, detail=error_detail)
     return df
 
 async def validate_df(df: pd.DataFrame):
@@ -31,6 +47,34 @@ async def validate_df(df: pd.DataFrame):
         })
     if df[REQUIRED_COLUMNS].isnull().any().any():
         raise HTTPException(status_code=400, detail=UPLOAD_ERRORS["EMPTY_VALUES"])
+
+
+async def check_duplicates(df: pd.DataFrame):
+    """
+    Check for duplicate UPCs with different names and duplicate names with different UPCs.
+    Returns dict with duplicate information or None if no duplicates found.
+    """
+    duplicate_issues = {}
+    
+    # Check for duplicate UPCs with different product names
+    duplicate_upcs = df[df.duplicated(subset=["UPC"], keep=False)]
+    if not duplicate_upcs.empty:
+        upc_groups = duplicate_upcs.groupby("UPC")["Product Name"].apply(lambda x: list(set(x))).to_dict()
+        # Only flag if same UPC has different names
+        conflicting_upcs = {upc: names for upc, names in upc_groups.items() if len(names) > 1}
+        if conflicting_upcs:
+            duplicate_issues["duplicate_upcs"] = conflicting_upcs
+    
+    # Check for duplicate product names with different UPCs
+    duplicate_names = df[df.duplicated(subset=["Product Name"], keep=False)]
+    if not duplicate_names.empty:
+        name_groups = duplicate_names.groupby("Product Name")["UPC"].apply(lambda x: list(set(x))).to_dict()
+        # Only flag if same name has different UPCs
+        conflicting_names = {name: upcs for name, upcs in name_groups.items() if len(upcs) > 1}
+        if conflicting_names:
+            duplicate_issues["duplicate_names"] = conflicting_names
+    
+    return duplicate_issues if duplicate_issues else None
 
 
 def merge_final_recommendations(

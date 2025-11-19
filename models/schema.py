@@ -1,6 +1,6 @@
 from datetime import datetime
 import uuid
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import Dict, List, Optional
 from bson import ObjectId
 from typing import Any
@@ -29,7 +29,16 @@ class UserCreate(UserBase):
     password: str
     role: UserRole
     name: str
+    email: Optional[EmailStr] = None
     tenantId: Optional[str] = None
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def validate_email(cls, v):
+        # Convert empty strings to None
+        if v is not None and isinstance(v, str) and v.strip() == '':
+            return None
+        return v
 
 class PyUser(UserBase):
     id: Any
@@ -38,6 +47,11 @@ class PyUser(UserBase):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class LoginResponse(Token):
+    role: str
+    tenantId: Optional[str]
+
 
 def to_serializable(doc):
     """Convert MongoDB ObjectId to string."""
@@ -99,11 +113,21 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[UserRole] = None
     name: Optional[str] = None
+    email: Optional[EmailStr] = None
     tenantId: Optional[str] = None
     status: Optional[UserStatus] = None
 
+    @field_validator('email', mode='before')
+    @classmethod
+    def validate_email(cls, v):
+        # Convert empty strings to None
+        if v is not None and isinstance(v, str) and v.strip() == '':
+            return None
+        return v
+
 
 class UserFilterRequest(BaseModel):
+    id: Optional[str] = None 
     tenantId: Optional[str] = None
     status: Optional[UserStatus] = None
     role: Optional[UserRole] = None
@@ -133,14 +157,14 @@ class StoreDisableRequest(BaseModel):
 
 
 class StoreFilterRequest(BaseModel):
-    tenantId: str
+    tenantId: Optional[str] = None
     locationId: Optional[str] = None
     storeId: Optional[str] = None
     status: Optional[UserStatus] = None
 
 
 class LocationFilterRequest(BaseModel):
-    tenantId: str
+    tenantId: Optional[str] = None
     locationId: Optional[str] = None
     status: Optional[UserStatus] = None
 
@@ -165,11 +189,14 @@ class AddStoreRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
+    id: str  
     username: str
     role: UserRole
     name: str
+    email: Optional[EmailStr] = None
     status: UserStatus
     tenant_id: Optional[str] = None
+    tenant_name: Optional[str] = None
     created_at: datetime
     created_by: Optional[str] = None
     updated_at: Optional[datetime] = None
@@ -177,3 +204,13 @@ class UserResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class UpdateLocationRequest(BaseModel):
+    tenantId: str
+    locationId: str
+    name: Optional[str] = None
+    status: Optional[UserStatus] = None  # reuse your existing enum
+
+class DisableLocationRequest(BaseModel):
+    tenantId: str
+    locationId: str

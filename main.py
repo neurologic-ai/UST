@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
+from middleware.user_header import add_user_headers
 from routes.recommendation_route import router as recommendation_router
 from routes.user_route import router as user_router
 from loguru import logger
@@ -30,9 +31,11 @@ def initialize_backend_application() -> fastapi.FastAPI:
         allow_credentials=True,    # or False, depending on your need
         allow_methods=["*"],       # <-- allow all
         allow_headers=["*"],       # <-- allow all
+        expose_headers=["Username-Authorities", "Role-Authorities", "Username-Id"],
     )
 
     app.add_middleware(ExceptionHandlerMiddleware)
+    app.middleware("http")(add_user_headers)
     app.include_router(recommendation_router)
     app.include_router(user_router)
     app.include_router(tenant_router)

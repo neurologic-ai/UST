@@ -271,7 +271,8 @@ async def delete_documents_for_tenant_location_and_store_ids(
         lunch_popular_collection_name,
         dinner_popular_collection_name,
         other_popular_collection_name,
-        lookup_collection
+        lookup_collection,
+        category_cache_collection
     ]
 
     for collection in collections:
